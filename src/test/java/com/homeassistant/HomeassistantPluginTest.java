@@ -1,13 +1,14 @@
-package com.example;
+package com.homeassistant;
 
 import net.runelite.client.RuneLite;
 import net.runelite.client.externalplugins.ExternalPluginManager;
+import com.homeassistant.HomeassistantPlugin;
 
-public class ExamplePluginTest
+public class HomeassistantPluginTest
 {
 	public static void main(String[] args) throws Exception
 	{
-		ExternalPluginManager.loadBuiltin(ExamplePlugin.class);
+		ExternalPluginManager.loadBuiltin(HomeassistantPlugin.class);
 		RuneLite.main(args);
 	}
 }
