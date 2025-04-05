@@ -40,8 +40,7 @@ mode: single
 ```
 Change the sensor id 'sensor.farming_contract_id' to the correct one created by the plugin. The ID will be runelite_yourusername_farming_contract
 
-This trigger will fire when the contract completion time attribute is in the past, and the status is still in_progress
-If you are currently playing runelite, the status will be changed to ready so this automation will never trigger if you're currently playing
+This trigger will fire when the contract completion time attribute is in the past, and the status is still in_progress. If you are currently playing runelite, the status will be changed to ready so this automation will never trigger if you're currently playing
 
 ### Fire even when you are currently playing
 You can just create an automation with a trigger that checks when the state of the sensor changes to 'ready' (optionally, from 'in_progress'). 
