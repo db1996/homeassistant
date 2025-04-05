@@ -55,3 +55,9 @@ You can just create an automation with a trigger that checks when the state of t
     - Formatted like this: 2025-04-05T18:00:00Z
 - 'other'
   - This happens if a patch has either never been planted, or if the patch is dead/deceased. Or if the farming contract patch is used by another seed
+
+    
+## Limitations
+Because of how these entities are made in home assistant (without a custom HACS integration), the entities will not persist through homeassistant reboots. Any automation based on the above will just never trigger when this happens. Once you login again after that, the entities will be made again automatically.
+
+You could send your own API call to homeassistant to create/update the entities yourself if you want to, for example when you're playing on mobile. But for it is not possible to automate with this plugin until a companion plugin is made in home assistant itself.
