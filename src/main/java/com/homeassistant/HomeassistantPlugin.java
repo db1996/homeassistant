@@ -54,6 +54,9 @@ public class HomeassistantPlugin extends Plugin
 	private ItemManager itemManager;
 
 	@Inject
+	private Gson gson;
+
+	@Inject
 	private Notifier notifier;
 
 	private final Map<Tab, Long> previousFarmingCompletionTimes = new EnumMap<>(Tab.class);
@@ -403,7 +406,7 @@ public class HomeassistantPlugin extends Plugin
 		payload.put("state", state);
 		payload.put("attributes", attributes);
 
-		Gson gson = new Gson();
+		Gson gson = this.gson.newBuilder().create();
 		String jsonPayload = gson.toJson(payload);
 
 		HttpRequest request = HttpRequest.newBuilder()
