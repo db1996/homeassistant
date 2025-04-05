@@ -113,7 +113,7 @@ public interface HomeassistantConfig extends Config
 			position = 201
 	)
 	default boolean herbPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -124,7 +124,7 @@ public interface HomeassistantConfig extends Config
 			position = 202
 	)
 	default boolean treePatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -135,7 +135,7 @@ public interface HomeassistantConfig extends Config
 			position = 203
 	)
 	default boolean fruitTreePatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -146,7 +146,7 @@ public interface HomeassistantConfig extends Config
 			position = 204
 	)
 	default boolean celastrusPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -157,7 +157,7 @@ public interface HomeassistantConfig extends Config
 			position = 204
 	)
 	default boolean hardwoodPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -168,7 +168,7 @@ public interface HomeassistantConfig extends Config
 			position = 205
 	)
 	default boolean calquatPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -179,7 +179,7 @@ public interface HomeassistantConfig extends Config
 			position = 206
 	)
 	default boolean redwoodPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -190,7 +190,7 @@ public interface HomeassistantConfig extends Config
 			position = 207
 	)
 	default boolean seaweedPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -201,7 +201,7 @@ public interface HomeassistantConfig extends Config
 			position = 208
 	)
 	default boolean hopsPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -212,7 +212,7 @@ public interface HomeassistantConfig extends Config
 			position = 209
 	)
 	default boolean bushPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -223,7 +223,7 @@ public interface HomeassistantConfig extends Config
 			position = 210
 	)
 	default boolean cactusPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -234,7 +234,7 @@ public interface HomeassistantConfig extends Config
 			position = 211
 	)
 	default boolean mushroomPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -245,7 +245,7 @@ public interface HomeassistantConfig extends Config
 			position = 212
 	)
 	default boolean belladonnaPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -256,7 +256,7 @@ public interface HomeassistantConfig extends Config
 			position = 213
 	)
 	default boolean crystalPatch() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -267,7 +267,7 @@ public interface HomeassistantConfig extends Config
 			position = 214
 	)
 	default boolean allotmentPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -278,7 +278,7 @@ public interface HomeassistantConfig extends Config
 			position = 215
 	)
 	default boolean flowerPatches() {
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -289,6 +289,6 @@ public interface HomeassistantConfig extends Config
 			position = 216
 	)
 	default boolean animaPatch() {
-		return true;
+		return false;
 	}
 }
