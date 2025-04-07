@@ -20,11 +20,9 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.timetracking.TimeTrackingConfig;
+import okhttp3.*;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -59,10 +57,12 @@ public class HomeassistantPlugin extends Plugin
 	@Inject
 	private Notifier notifier;
 
+	@Inject
+	private OkHttpClient okHttpClient;
+
 	private final Map<Tab, Long> previousFarmingCompletionTimes = new EnumMap<>(Tab.class);
 	private long previousBirdhouseCompletionTime = -2L;
 	private long previousFarmingContractCompletionTime = -2L;
-	private final HttpClient httpClient = HttpClient.newHttpClient(); // Instance variable initialization
 
 	@Override
 	protected void startUp() throws Exception
@@ -408,24 +408,26 @@ public class HomeassistantPlugin extends Plugin
 
 		Gson gson = this.gson.newBuilder().create();
 		String jsonPayload = gson.toJson(payload);
+		RequestBody requestBody = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), jsonPayload);
 
-		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(apiUrl))
+		Request request = new Request.Builder()
+				.url(Objects.requireNonNull(HttpUrl.parse(apiUrl)))
 				.header("Authorization", "Bearer " + accessToken)
 				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+				.post(requestBody)
 				.build();
 
-		httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-				.thenAccept(response -> {
-					log.info("Home Assistant update for {} - Status: {}", entityId, response.statusCode());
-					if (response.statusCode() >= 400) {
-						log.error("Home Assistant update failed for {}: {}", entityId, response.body());
-					}
-				})
-				.exceptionally(e -> {
-					log.error("Error sending Home Assistant update for {}: {}", entityId, e.getMessage());
-					return null;
-				});
+		okHttpClient.newCall(request).enqueue(new Callback() {
+			@Override
+			public void onFailure(Call call, IOException e) {
+				log.error("Error submitting the entity to homeassistant, entity: " + entityId, e);
+			}
+
+			@Override
+			public void onResponse(Call call, Response response) throws IOException {
+				log.info("Successfully created/updated entity {}.", entityId);
+				response.close();
+			}
+		});
 	}
 }
