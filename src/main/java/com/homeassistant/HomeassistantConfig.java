@@ -33,10 +33,21 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "validate_token",
+			name = "Validate Home Assistant Token",
+			description = "Turn on to validate your homeassistant setup, will provide details in game messages. ",
+			position = 3
+	)
+	default boolean validateToken()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "ignorefarmingguild",
 			name = "Ignore Farming Guild",
 			description = "Ignore patches in the farming guild when determining the next update.",
-			position = 3
+			position = 4
 	)
 	default boolean ignoreFarmingGuild() {
 		return true;
