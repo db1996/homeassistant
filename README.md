@@ -8,9 +8,15 @@ This lets you create automations to send notifications when you're not playing.
 3. In the plugin settings in runelite 
    - Enter your home assistant domain
    - Enter your long-lived access token
-   - Choose which entities you want to update, each one of these requires a call to home assistant so limiting it may improve performance
 
-Once you login for the first time with this plugin active, all entities will be created/updated when logging in and whenever something changes with your farming patches
+## Setup home assistant custom integration
+
+I have created an accompanying custom integration that makes the sensors long-lived. And has easy to use actions to do things manually.
+
+**This is required**.<br> 
+The services created by the custom integration are used in this plugin, which drastically reduces the amount of calls needed.
+
+Check here for instructions: https://github.com/home-assistant/brands/pull/7083
 
 ## Setup automation in home assistant
 If you want to react to when a farming patch is ready, and you're not online currently, create a new automation in the web interface and edit as YAML
