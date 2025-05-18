@@ -62,9 +62,11 @@ public class HomeassistantPlugin extends Plugin
 	@Inject
 	private OkHttpClient okHttpClient;
 
+	private int farmingTickOffset = 0;
 	private final Map<Tab, Long> previousFarmingCompletionTimes = new EnumMap<>(Tab.class);
 	private long previousBirdhouseCompletionTime = -2L;
 	private long previousFarmingContractCompletionTime = -2L;
+
 
 	private final Map<Tab, Long> nextFarmingCompletionTimes = new EnumMap<>(Tab.class);
 	private long nextBirdhouseCompletionTime = -2L;
@@ -74,11 +76,7 @@ public class HomeassistantPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		log.debug("Homeassistant started!");
-		for (Tab tab : Tab.values()) {
-			previousFarmingCompletionTimes.put(tab, -2L);
-		}
-		previousBirdhouseCompletionTime = -2L;
-		previousFarmingContractCompletionTime = -2L;
+		resetCompletionTimes();
 		initializeTrackers();
 	}
 
@@ -146,11 +144,20 @@ public class HomeassistantPlugin extends Plugin
 		);
 	}
 
+	private void resetCompletionTimes(){
+		for (Tab tab : Tab.values()) {
+			previousFarmingCompletionTimes.put(tab, -2L);
+		}
+		previousBirdhouseCompletionTime = -2L;
+		previousFarmingContractCompletionTime = -2L;
+	}
+
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged) {
 		if (gameStateChanged.getGameState() != GameState.LOGGED_IN) {
 			return;
 		}
+		resetCompletionTimes();
 
 		birdHouseTracker.loadFromConfig();
 		farmingTracker.loadCompletionTimes();
@@ -178,6 +185,11 @@ public class HomeassistantPlugin extends Plugin
 	}
 
 	private void updateAllEntities() {
+		String username = getUsername();
+		if(username == null){
+			return;
+		}
+
 		List<Map<String, Object>> entities = new ArrayList<>();
 
 		for (Tab tab : Tab.values()) {
@@ -287,9 +299,25 @@ public class HomeassistantPlugin extends Plugin
 
 		// ✅ Send it to HA using your existing HTTP call method
 		sendPayloadToHomeAssistant(jsonPayload);
+
+
+		int offset = configManager.getRSProfileConfiguration(TimeTrackingConfig.CONFIG_GROUP, TimeTrackingConfig.FARM_TICK_OFFSET, int.class);
+		offset = offset * -1;
+
+		if (offset != farmingTickOffset) {
+			farmingTickOffset = offset;
+			Map<String, Object> farmingTickAttributes = new HashMap<>();
+			farmingTickAttributes.put("username", username);
+			farmingTickAttributes.put("farming_tick_offset", offset);
+			sendPayloadToHomeAssistant(gson.toJson(farmingTickAttributes), "/services/runelite/set_farming_tick_offset");
+		}
 	}
 
 	private void sendPayloadToHomeAssistant(String jsonPayload) {
+		sendPayloadToHomeAssistant(jsonPayload, "/services/runelite/set_multi_entity_data");
+	}
+
+	private void sendPayloadToHomeAssistant(String jsonPayload, String url) {
 		String homeAssistantUrl = config.homeassistantUrl(); // Assuming you have this in your config
 		String accessToken = config.homeassistantToken(); // Assuming you have this in your config
 
@@ -298,9 +326,9 @@ public class HomeassistantPlugin extends Plugin
 			return;
 		}
 
-		String apiUrl = homeAssistantUrl + "/api/services/runelite/set_multi_entity_data";
+		String apiUrl = homeAssistantUrl + "/api" + url;
 		RequestBody requestBody = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), jsonPayload);
-
+		log.debug("Sending payload to home assistant, {}: {}", apiUrl, jsonPayload);
 		Request request = new Request.Builder()
 				.url(Objects.requireNonNull(HttpUrl.parse(apiUrl)))
 				.header("Authorization", "Bearer " + accessToken)
@@ -507,9 +535,7 @@ public class HomeassistantPlugin extends Plugin
 
 	private String generateFarmingPatchEntityId(Tab tab) {
 		try {
-
-			String username = Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
-			return String.format("sensor.runelite_%s_%s_patch", username, tab.name().toLowerCase());
+			return String.format("sensor.runelite_%s_%s_patch", getUsername(), tab.name().toLowerCase());
 		}catch (NullPointerException e){
 			log.error("Error generating entity id for {}: {}", tab.name(), e.getMessage());
 			return null;
@@ -518,9 +544,7 @@ public class HomeassistantPlugin extends Plugin
 
 	private String generateBirdhouseEntityId() {
 		try{
-
-			String username = Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
-			return String.format("sensor.runelite_%s_birdhouses", username);
+			return String.format("sensor.runelite_%s_birdhouses", getUsername());
 		}catch (NullPointerException e){
 			log.error("Error generating entity id for birdhouses: {}", e.getMessage());
 			return null;
@@ -530,11 +554,27 @@ public class HomeassistantPlugin extends Plugin
 
 	private String generateFarmingContractEntityId() {
 		try{
-
-			String username = Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
-			return String.format("sensor.runelite_%s_farming_contract", username);
+			return String.format("sensor.runelite_%s_farming_contract", getUsername());
 		}catch (NullPointerException e){
 			log.error("Error generating entity id for farming contract: {}", e.getMessage());
+			return null;
+		}
+	}
+
+	private String generateFarmingTickEntityId() {
+		try{
+			return String.format("runelite_%s_farming_tick_offset", getUsername());
+		}catch (NullPointerException e){
+			log.error("Error generating entity id for farming contract: {}", e.getMessage());
+			return null;
+		}
+	}
+
+	private String getUsername(){
+		try{
+			return Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
+		}catch (NullPointerException e){
+			log.error("Error fetching username: {}", e.getMessage());
 			return null;
 		}
 	}
