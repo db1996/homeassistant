@@ -64,6 +64,6 @@ You can just create an automation with a trigger that checks when the state of t
 
     
 ## Limitations
-Because of how these entities are made in home assistant (without a custom HACS integration), the entities will not persist through homeassistant reboots. Any automation based on the above will just never trigger when this happens. Once you login again after that, the entities will be made again automatically.
+There are currently no sensors for each seperate patch, but I opted to create sensors for each farming patch type, farming contract and birdhouses.
 
-You could send your own API call to homeassistant to create/update the entities yourself if you want to, for example when you're playing on mobile. But for it is not possible to automate with this plugin until a companion plugin is made in home assistant itself.
+This Plugin updates the patch type sensors completion time and status for the latest crop planted. So if you do a herb run, the sensor will reflect the last herb planted in your herb run. 
