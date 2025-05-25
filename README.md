@@ -16,7 +16,7 @@ I have created an accompanying custom integration that makes the sensors long-li
 **This is required**.<br> 
 The services created by the custom integration are used in this plugin, which drastically reduces the amount of calls needed.
 
-Check here for instructions: https://github.com/home-assistant/brands/pull/7083
+Check here for instructions: https://github.com/db1996/homeassistant_runelite
 
 ## Setup automation in home assistant
 If you want to react to when a farming patch is ready, and you're not online currently, create a new automation in the web interface and edit as YAML
