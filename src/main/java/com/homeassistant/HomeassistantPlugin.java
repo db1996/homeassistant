@@ -570,12 +570,15 @@ public class HomeassistantPlugin extends Plugin
 		}
 	}
 
-	private String getUsername(){
-		try{
-			return Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
-		}catch (NullPointerException e){
-			log.error("Error fetching username: {}", e.getMessage());
-			return null;
-		}
+	private String getUsername() {
+	    try {
+	        return Objects.requireNonNull(client.getLocalPlayer().getName())
+	                      .toLowerCase()
+	                      .replace(" ", "_");
+	    } catch (NullPointerException e) {
+	        log.error("Error fetching username: {}", e.getMessage());
+	        return null;
+	    }
 	}
+
 }
