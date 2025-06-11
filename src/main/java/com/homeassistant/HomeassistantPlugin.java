@@ -639,13 +639,15 @@ public class HomeassistantPlugin extends Plugin
 		}
 	}
 
-	private String getUsername(){
-		try{
-			return Objects.requireNonNull(client.getLocalPlayer().getName()).toLowerCase();
-		}catch (NullPointerException e){
-			log.error("Error fetching username: {}", e.getMessage());
-			return null;
-		}
+	private String getUsername() {
+	    try {
+	        return Objects.requireNonNull(client.getLocalPlayer().getName())
+	                      .toLowerCase()
+	                      .replace(" ", "_");
+	    } catch (NullPointerException e) {
+	        log.error("Error fetching username: {}", e.getMessage());
+	        return null;
+	    }
 	}
 
 	private void checkAllDailies() {
@@ -666,7 +668,7 @@ public class HomeassistantPlugin extends Plugin
 			dailyStatuses.put(DailyTask.HERB_BOXES, -1);
 			return;
 		}
-		
+
 		if (client.getVarbitValue(VarbitID.NZONE_HERBBOXES_PURCHASED) < HERB_BOX_MAX)
 		{
 			dailyStatuses.put(DailyTask.HERB_BOXES, 0);
@@ -681,7 +683,7 @@ public class HomeassistantPlugin extends Plugin
 			dailyStatuses.put(DailyTask.STAVES, -1);
 			return;
 		}
-		
+
 		if (client.getVarbitValue(VarbitID.ZAFF_LAST_CLAIMED) == 0) {
 			dailyStatuses.put(DailyTask.STAVES, 0);
 		} else {
@@ -695,7 +697,7 @@ public class HomeassistantPlugin extends Plugin
 			dailyStatuses.put(DailyTask.ESSENCE, -1);
 			return;
 		}
-		
+
 		if (client.getVarbitValue(VarbitID.ARDOUGNE_FREE_ESSENCE) == 0) {
 			dailyStatuses.put(DailyTask.ESSENCE, 0);
 
