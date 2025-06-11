@@ -5,6 +5,7 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 
 import com.homeassistant.enums.PatchStatus;
+import com.homeassistant.enums.DailyTask;
 import com.homeassistant.runelite.farming.*;
 import com.homeassistant.runelite.hunter.BirdHouseTracker;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,9 @@ import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -34,33 +38,33 @@ import java.util.concurrent.CompletableFuture;
 )
 public class HomeassistantPlugin extends Plugin
 {
+	private static final int HERB_BOX_MAX = 15;
+	private static final int HERB_BOX_COST = 9500;
+	private static final int SAND_QUEST_COMPLETE = 160;
+	private static final int ONE_DAY = 86400000;
+
 	@Inject
 	private Client client;
-
 	@Inject
 	private ClientThread clientThread;
-
 	@Inject
 	private HomeassistantConfig config;
-
 	@Inject
 	private ConfigManager configManager;
+
+
+	@Inject
+	private ItemManager itemManager;
+	@Inject
+	private Gson gson;
+	@Inject
+	private Notifier notifier;
+	@Inject
+	private OkHttpClient okHttpClient;
 
 	private BirdHouseTracker birdHouseTracker;
 	private FarmingTracker farmingTracker;
 	private FarmingContractManager farmingContractManager;
-
-	@Inject
-	private ItemManager itemManager;
-
-	@Inject
-	private Gson gson;
-
-	@Inject
-	private Notifier notifier;
-
-	@Inject
-	private OkHttpClient okHttpClient;
 
 	private int farmingTickOffset = 0;
 	private final Map<Tab, Long> previousFarmingCompletionTimes = new EnumMap<>(Tab.class);
@@ -72,12 +76,37 @@ public class HomeassistantPlugin extends Plugin
 	private long nextBirdhouseCompletionTime = -2L;
 	private long nextFarmingContractCompletionTime = -2L;
 
+	private final Map<DailyTask, Integer> dailyStatuses = new EnumMap<>(DailyTask.class);
+	private final Map<DailyTask, Integer> previousDailyStatuses = new EnumMap<>(DailyTask.class);
+
+	private boolean isLoggingIn = false;
+
 	@Override
 	protected void startUp() throws Exception
 	{
 		log.debug("Homeassistant started!");
+		resetDailies();
 		resetCompletionTimes();
 		initializeTrackers();
+
+		isLoggingIn = true;
+	}
+
+	private void resetDailies() {
+		dailyStatuses.clear();
+
+		for (DailyTask tab : DailyTask.values()) {
+			dailyStatuses.put(tab, -1);
+		}
+
+		resetPreviousDailies();
+	}
+
+	private void resetPreviousDailies(){
+		previousDailyStatuses.clear();
+		for (DailyTask tab : DailyTask.values()) {
+			previousDailyStatuses.put(tab, dailyStatuses.get(tab));
+		}
 	}
 
 	private boolean isRelevantFarmingTab(Tab tab) {
@@ -87,6 +116,7 @@ public class HomeassistantPlugin extends Plugin
 	@Override
 	protected void shutDown() throws Exception
 	{
+		resetDailies();
 		log.info("Homeassistant stopped!");
 	}
 
@@ -154,11 +184,14 @@ public class HomeassistantPlugin extends Plugin
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged) {
+		if (gameStateChanged.getGameState() == GameState.LOGGING_IN){
+			isLoggingIn = true;
+		}
+
 		if (gameStateChanged.getGameState() != GameState.LOGGED_IN) {
 			return;
 		}
 		resetCompletionTimes();
-
 		birdHouseTracker.loadFromConfig();
 		farmingTracker.loadCompletionTimes();
 		farmingContractManager.loadContractFromConfig();
@@ -171,7 +204,6 @@ public class HomeassistantPlugin extends Plugin
 		if (!group.equals(TimeTrackingConfig.CONFIG_GROUP) && !group.equals(HomeassistantConfig.CONFIG_GROUP)) {
 			return;
 		}
-
 		if (event.getKey().equals("validate_token") && config.validateToken())
 		{
 			testHomeAssistant();
@@ -182,6 +214,15 @@ public class HomeassistantPlugin extends Plugin
 		farmingContractManager.loadContractFromConfig();
 
 		updateAllEntities();
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		if (isLoggingIn){
+			isLoggingIn = false;
+			checkAllDailies();
+		}
 	}
 
 	private void updateAllEntities() {
@@ -258,33 +299,49 @@ public class HomeassistantPlugin extends Plugin
 				attributes.put("status", PatchStatus.IN_PROGRESS.getName());
 				String contractName = farmingContractManager.getContractName();
 				Tab tab = farmingContractManager.getContractTab();
-				try {
-                    assert tab != null;
-                    attributes.put("patch_type", tab.name().toLowerCase());
-					attributes.put("crop_type", contractName);
-				}catch (NullPointerException e){
-					log.debug("Error getting contract name or tab: {}", e.getMessage());
-				}
-
-				log.info("Farming contract completion time: {}", nextFarmingContractCompletionTime);
-				PatchStatus patchStatus = PatchStatus.READY;
-				if (nextFarmingContractCompletionTime > 0) {
-					patchStatus = PatchStatus.IN_PROGRESS;
-					if(nextFarmingContractCompletionTime == Long.MAX_VALUE){
-						patchStatus = PatchStatus.OTHER;
-					}else{
-//				log.info("Farming contract completion time: {}", Instant.ofEpochSecond(completionTime).toString());
-						attributes.put("completion_time", Instant.ofEpochSecond(nextFarmingContractCompletionTime).toString());
+				if (tab != null){
+					try {
+						attributes.put("patch_type", tab.name().toLowerCase());
+						attributes.put("crop_type", contractName);
+					}catch (NullPointerException e){
+						log.debug("Error getting contract name or tab: {}", e.getMessage());
 					}
-				}else if(nextFarmingContractCompletionTime == -1){
-					patchStatus = PatchStatus.NEVER_PLANTED;
-				}
-				attributes.put("status", patchStatus.getName());
 
-				entities.add(attributes); // ✅ add to array
-				previousFarmingContractCompletionTime = nextFarmingContractCompletionTime;
+					log.info("Farming contract completion time: {}", nextFarmingContractCompletionTime);
+					PatchStatus patchStatus = PatchStatus.READY;
+					if (nextFarmingContractCompletionTime > 0) {
+						patchStatus = PatchStatus.IN_PROGRESS;
+						if(nextFarmingContractCompletionTime == Long.MAX_VALUE){
+							patchStatus = PatchStatus.OTHER;
+						} else {
+//				log.info("Farming contract completion time: {}", Instant.ofEpochSecond(completionTime).toString());
+							attributes.put("completion_time", Instant.ofEpochSecond(nextFarmingContractCompletionTime).toString());
+						}
+					}else if(nextFarmingContractCompletionTime == -1){
+						patchStatus = PatchStatus.NEVER_PLANTED;
+					}
+					attributes.put("status", patchStatus.getName());
+
+					entities.add(attributes); // ✅ add to array
+					previousFarmingContractCompletionTime = nextFarmingContractCompletionTime;
+				}
 			}
 		}
+
+		dailyStatuses.forEach((name, status) -> {
+			if (!previousDailyStatuses.get(name).equals(status)) {
+				String entityId = generateDailyEntityId(name.getId());
+				if (entityId == null){
+					return;
+				}
+
+				Map<String, Object> attributes = new HashMap<>();
+				attributes.put("entity_id", entityId);
+				attributes.put("state", status);
+				entities.add(attributes);
+			}
+		});
+		resetPreviousDailies();
 
 		if(entities.isEmpty()){
 			return;
@@ -398,7 +455,7 @@ public class HomeassistantPlugin extends Plugin
 							String.format("Invalid Home Assistant token or URL. Code: %s, message: %s", code, message),
 						null
 					));
-				}else{
+				} else {
 					clientThread.invoke(() -> client.addChatMessage(
 						ChatMessageType.GAMEMESSAGE,
 						"",
@@ -441,7 +498,7 @@ public class HomeassistantPlugin extends Plugin
 										String.format("Could not list home assistant services. Code: %s, message: %s", code, message),
 										null
 								));
-							}else{
+							} else {
 								log.info("Successfully listed home assistant services.");
 								try {
 									String responseBody = response.body().string();
@@ -465,7 +522,7 @@ public class HomeassistantPlugin extends Plugin
 											"To make this plugin work, please add the 'runelite' integration to Home Assistant, more information in this plugin's GitHub repository.",
 											null
 										));
-									}else{
+									} else {
 										clientThread.invoke(() -> client.addChatMessage(
 											ChatMessageType.GAMEMESSAGE,
 											"",
@@ -535,9 +592,21 @@ public class HomeassistantPlugin extends Plugin
 
 	private String generateFarmingPatchEntityId(Tab tab) {
 		try {
+			if(tab == Tab.BIG_COMPOST){
+				return String.format("sensor.runelite_%s_%s", getUsername(), tab.name().toLowerCase());
+			}
 			return String.format("sensor.runelite_%s_%s_patch", getUsername(), tab.name().toLowerCase());
 		}catch (NullPointerException e){
 			log.error("Error generating entity id for {}: {}", tab.name(), e.getMessage());
+			return null;
+		}
+	}
+
+	private String generateDailyEntityId(String str){
+		try {
+			return String.format("sensor.runelite_%s_daily_%s", getUsername(), str.toLowerCase());
+		}catch (NullPointerException e){
+			log.error("Error generating entity id for daily {}: {}", str, e.getMessage());
 			return null;
 		}
 	}
@@ -576,6 +645,133 @@ public class HomeassistantPlugin extends Plugin
 		}catch (NullPointerException e){
 			log.error("Error fetching username: {}", e.getMessage());
 			return null;
+		}
+	}
+
+	private void checkAllDailies() {
+		resetPreviousDailies();
+		checkHerbBoxes();
+		checkStaves();
+		checkEssence();
+		checkRunes();
+		checkSand();
+		checkFlax();
+		checkArrows();
+		checkDynamite();
+	}
+
+	private void checkHerbBoxes()
+	{
+		if(client.getVarbitValue(VarbitID.IRONMAN) != 0 || client.getVarpValue(VarPlayerID.NZONE_REWARDPOINTS) < HERB_BOX_COST){
+			dailyStatuses.put(DailyTask.HERB_BOXES, -1);
+			return;
+		}
+		
+		if (client.getVarbitValue(VarbitID.NZONE_HERBBOXES_PURCHASED) < HERB_BOX_MAX)
+		{
+			dailyStatuses.put(DailyTask.HERB_BOXES, 0);
+		} else {
+			dailyStatuses.put(DailyTask.HERB_BOXES, 1);
+		}
+	}
+
+	private void checkStaves()
+	{
+		if (client.getVarbitValue(VarbitID.VARROCK_DIARY_EASY_COMPLETE) != 1) {
+			dailyStatuses.put(DailyTask.STAVES, -1);
+			return;
+		}
+		
+		if (client.getVarbitValue(VarbitID.ZAFF_LAST_CLAIMED) == 0) {
+			dailyStatuses.put(DailyTask.STAVES, 0);
+		} else {
+			dailyStatuses.put(DailyTask.STAVES, 1);
+		}
+	}
+
+	private void checkEssence()
+	{
+		if (client.getVarbitValue(VarbitID.ARDOUGNE_DIARY_MEDIUM_COMPLETE) != 1) {
+			dailyStatuses.put(DailyTask.ESSENCE, -1);
+			return;
+		}
+		
+		if (client.getVarbitValue(VarbitID.ARDOUGNE_FREE_ESSENCE) == 0) {
+			dailyStatuses.put(DailyTask.ESSENCE, 0);
+
+		} else {
+			dailyStatuses.put(DailyTask.ESSENCE, 1);
+		}
+	}
+
+	private void checkRunes()
+	{
+		if(client.getVarbitValue(VarbitID.WILDERNESS_DIARY_EASY_COMPLETE) == 1){
+			dailyStatuses.put(DailyTask.RUNES, -1);
+			return;
+		}
+
+		if (client.getVarbitValue(VarbitID.LUNDAIL_LAST_CLAIMED) == 0) {
+			dailyStatuses.put(DailyTask.RUNES, 0);
+		} else {
+			dailyStatuses.put(DailyTask.RUNES, 1);
+		}
+	}
+
+	private void checkSand()
+	{
+		if (client.getVarbitValue(VarbitID.IRONMAN) == 2 /* UIM */
+			|| client.getVarbitValue(VarbitID.HANDSAND_QUEST) < SAND_QUEST_COMPLETE) {
+			dailyStatuses.put(DailyTask.SAND, -1);
+			return;
+		}
+
+		if (client.getVarbitValue(VarbitID.YANILLE_SAND_CLAIMED) == 0) {
+			dailyStatuses.put(DailyTask.SAND, 0);
+		} else {
+			dailyStatuses.put(DailyTask.SAND, 1);
+		}
+	}
+
+	private void checkFlax()
+	{
+		if (client.getVarbitValue(VarbitID.KANDARIN_DIARY_EASY_COMPLETE) != 1) {
+			dailyStatuses.put(DailyTask.FLAX, -1);
+			return;
+		}
+
+		if (client.getVarbitValue(VarbitID.SEERS_FREE_FLAX) == 0) {
+			dailyStatuses.put(DailyTask.FLAX, 0);
+		} else {
+			dailyStatuses.put(DailyTask.FLAX, 1);
+		}
+	}
+
+	private void checkArrows()
+	{
+		if (client.getVarbitValue(VarbitID.WESTERN_DIARY_EASY_COMPLETE) != 1) {
+			dailyStatuses.put(DailyTask.ARROWS, -1);
+			return;
+		}
+
+		if (client.getVarbitValue(VarbitID.WESTERN_RANTZ_ARROWS) == 0) {
+			dailyStatuses.put(DailyTask.ARROWS, 0);
+		} else {
+			dailyStatuses.put(DailyTask.ARROWS, 1);
+		}
+	}
+
+	private void checkDynamite()
+	{
+		if (client.getVarbitValue(VarbitID.KOUREND_DIARY_MEDIUM_COMPLETE) == 1){
+			dailyStatuses.put(DailyTask.DYNAMITE, -1);
+			return;
+		}
+
+		if (client.getVarbitValue(VarbitID.KOUREND_FREE_DYNAMITE) == 0) {
+			dailyStatuses.put(DailyTask.DYNAMITE, 0);
+		} else {
+			dailyStatuses.put(DailyTask.DYNAMITE, 1);
 		}
 	}
 }
