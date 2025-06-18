@@ -10,11 +10,34 @@ public interface HomeassistantConfig extends Config
 {
 	String CONFIG_GROUP = "homeassistant";
 
+
+	@ConfigSection(
+			name = "Homeassistant",
+			description = "Homeassistant connection settings",
+			position = 100
+	)
+	String homeassistantSection = "Homeassistant";
+
+	@ConfigSection(
+			name = "Entities",
+			description = "Select which entites you want to update in homeassistant",
+			position = 200
+	)
+	String entitiesSection = "Entities";
+
+	@ConfigSection(
+			name = "Miscellaneous",
+			description = "Some miscellaneous settings",
+			position = 300
+	)
+	String miscellaneousSection = "Miscellaneous";
+
 	@ConfigItem(
 			keyName = "homeassistant_url",
 			name = "Homeassistant Base URL",
 			description = "example: http://homeassistant.local:8123",
-			position = 1
+			section = homeassistantSection,
+			position = 101
 	)
 	default String homeassistantUrl()
 	{
@@ -25,7 +48,8 @@ public interface HomeassistantConfig extends Config
 			keyName = "homeassistant_token",
 			name = "Homeassistant Access token",
 			description = "Your home assistant access token",
-			position = 2
+			section = homeassistantSection,
+			position = 102
 	)
 	default String homeassistantToken()
 	{
@@ -36,7 +60,8 @@ public interface HomeassistantConfig extends Config
 			keyName = "validate_token",
 			name = "Validate Home Assistant Token",
 			description = "Turn on to validate your homeassistant setup, will provide details in game messages. ",
-			position = 3
+			section = homeassistantSection,
+			position = 103
 	)
 	default boolean validateToken()
 	{
@@ -44,262 +69,123 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
-			keyName = "ignorefarmingguild",
-			name = "Ignore Farming Guild",
-			description = "Ignore patches in the farming guild when determining the next update.",
-			position = 4
+			keyName = "farmingpatches",
+			name = "Farming patches",
+			description = "Update farming patches entities",
+			section = entitiesSection,
+			position = 201
 	)
-	default boolean ignoreFarmingGuild() {
+	default boolean farmingPatches() {
+		return true;
+	}
+	@ConfigItem(
+			keyName = "farmingcontract",
+			name = "Farming contract",
+			description = "Update farming contract entity",
+			section = entitiesSection,
+			position = 202
+	)
+	default boolean farmingContract() {
 		return true;
 	}
 
 
-	@ConfigSection(
-			name = "Miscellaneous",
-			description = "Settings for miscellaneous infoboxes",
-			position = 100
-	)
-	String miscellaneousSection = "Miscellaneous";
-
-	@ConfigSection(
-			name = "Farming patches",
-			description = "Settings for farming patch infoboxes",
-			position = 200
-	)
-	String farmingPatchesSection = "Farming patches";
-
-	// -- Miscellaneous infoboxes ---
-
 	@ConfigItem(
 			keyName = "birdhouses",
 			name = "Bird houses",
-			description = "Create an entity for when your bird houses are ready.",
-			section = miscellaneousSection,
-			position = 101
+			description = "Update birdhouse timer entities",
+			section = entitiesSection,
+			position = 203
 	)
 	default boolean birdHouses() {
 		return true;
 	}
 
 	@ConfigItem(
-			keyName = "farmingcontract",
-			name = "Farming contract",
-			description = "Create an entity for when your farming contract is ready.",
-			section = miscellaneousSection,
-			position = 102
-	)
-	default boolean farmingContract() {
-		return true;
-	}
-
-	@ConfigItem(
-			keyName = "hespori",
-			name = "Hespori",
-			description = "Create an entity for when your Hespori patch is ready.",
-			section = miscellaneousSection,
-			position = 103
-	)
-	default boolean hespori() {
-		return true;
-	}
-
-	@ConfigItem(
-			keyName = "giantcompostbin",
-			name = "Giant compost bin",
-			description = "Create an entity for when your giant compost bin is ready.",
-			section = miscellaneousSection,
-			position = 104
-	)
-	default boolean giantCompostBin() {
-		return true;
-	}
-
-	// -- Farming patch infoboxes ---
-
-	@ConfigItem(
-			keyName = "herbpatches",
-			name = "Herb patches",
-			description = "Create an entity for when your herb patches are ready.",
-			section = farmingPatchesSection,
-			position = 201
-	)
-	default boolean herbPatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "treepatches",
-			name = "Tree patches",
-			description = "Create an entity for when your tree patches are ready.",
-			section = farmingPatchesSection,
-			position = 202
-	)
-	default boolean treePatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "fruittreepatches",
-			name = "Fruit tree patches",
-			description = "Create an entity for when your fruit tree patches are ready.",
-			section = farmingPatchesSection,
+			keyName = "dailies",
+			name = "Dailies",
+			description = "Update dailies entities (Battlestaves, sand etc)",
+			section = entitiesSection,
 			position = 203
 	)
-	default boolean fruitTreePatches() {
-		return false;
+	default boolean dailies() {
+		return true;
 	}
 
 	@ConfigItem(
-			keyName = "celastrusPatch",
-			name = "Celastrus patch",
-			description = "Create an entity for when your celastrus patch is ready.",
-			section = farmingPatchesSection,
+			keyName = "player_health",
+			name = "Player health",
+			description = "Update player health, this can result in a lot of calls",
+			section = entitiesSection,
 			position = 204
 	)
-	default boolean celastrusPatch() {
+	default boolean playerHealth() {
 		return false;
 	}
 
 	@ConfigItem(
-			keyName = "hardwoodpatches",
-			name = "Hardwood patches",
-			description = "Create an entity for when your hardwood patches are ready.",
-			section = farmingPatchesSection,
-			position = 204
-	)
-	default boolean hardwoodPatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "calquatpatch",
-			name = "Calquat patch",
-			description = "Create an entity for when your calquat patch is ready.",
-			section = farmingPatchesSection,
+			keyName = "player_prayer",
+			name = "Player prayer",
+			description = "Update player prayer, this can result in a lot of calls",
+			section = entitiesSection,
 			position = 205
 	)
-	default boolean calquatPatch() {
+	default boolean playerPrayer() {
 		return false;
 	}
 
 	@ConfigItem(
-			keyName = "redwoodpatch",
-			name = "Redwood patch",
-			description = "Create an entity for when your redwood patch is ready.",
-			section = farmingPatchesSection,
+			keyName = "player_special_attack",
+			name = "Player special attack %",
+			description = "Update player special attack",
+			section = entitiesSection,
 			position = 206
 	)
-	default boolean redwoodPatch() {
+	default boolean playerSpecialAttack() {
 		return false;
 	}
 
 	@ConfigItem(
-			keyName = "seaweedpatches",
-			name = "Seaweed patches",
-			description = "Create an entity for when your seaweed patches are ready.",
-			section = farmingPatchesSection,
-			position = 207
+			keyName = "player_run_energy",
+			name = "Player run energy %",
+			description = "Update player run energy, this can result in a lot of calls",
+			section = entitiesSection,
+			position = 206
 	)
-	default boolean seaweedPatches() {
+	default boolean playerRunEnergy() {
 		return false;
 	}
 
 	@ConfigItem(
-			keyName = "hopspatches",
-			name = "Hops patches",
-			description = "Create an entity for when your hops patches are ready.",
-			section = farmingPatchesSection,
-			position = 208
+			keyName = "player_status_effects",
+			name = "Player status effects",
+			description = "Will update for poison and venom (more soon)",
+			section = entitiesSection,
+			position = 206
 	)
-	default boolean hopsPatches() {
+	default boolean playerStatusEffects() {
 		return false;
 	}
 
 	@ConfigItem(
-			keyName = "bushpatches",
-			name = "Bush patches",
-			description = "Create an entity for when your bush patches are ready.",
-			section = farmingPatchesSection,
-			position = 209
+			keyName = "ignorefarmingguild",
+			name = "Ignore Farming Guild",
+			description = "Ignore patches in the farming guild when determining the next update.",
+			section = miscellaneousSection,
+			position = 301
 	)
-	default boolean bushPatches() {
-		return false;
+	default boolean ignoreFarmingGuild() {
+		return true;
 	}
 
 	@ConfigItem(
-			keyName = "cactuspatches",
-			name = "Cactus patches",
-			description = "Create an entity for when your cactus patches are ready.",
-			section = farmingPatchesSection,
-			position = 210
+			keyName = "farming_tick_offset",
+			name = "Farming tick offset",
+			description = "Tick offsets are account specific, this will automatically update it in homeassistant.",
+			section = miscellaneousSection,
+			position = 302
 	)
-	default boolean cactusPatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "mushroompatch",
-			name = "Mushroom patch",
-			description = "Create an entity for when your mushroom patch is ready.",
-			section = farmingPatchesSection,
-			position = 211
-	)
-	default boolean mushroomPatch() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "belladonnapatch",
-			name = "Belladonna patch",
-			description = "Create an entity for when your belladonna patch is ready.",
-			section = farmingPatchesSection,
-			position = 212
-	)
-	default boolean belladonnaPatch() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "crystalpatch",
-			name = "Crystal patch",
-			description = "Create an entity for when your crystal patch is ready.",
-			section = farmingPatchesSection,
-			position = 213
-	)
-	default boolean crystalPatch() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "allotmentpatches",
-			name = "Allotment patches",
-			description = "Create an entity for when your allotment patches are ready.",
-			section = farmingPatchesSection,
-			position = 214
-	)
-	default boolean allotmentPatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "flowerpatches",
-			name = "Flower patches",
-			description = "Create an entity for when your flower patches are ready.",
-			section = farmingPatchesSection,
-			position = 215
-	)
-	default boolean flowerPatches() {
-		return false;
-	}
-
-	@ConfigItem(
-			keyName = "animapatch",
-			name = "Anima patch",
-			description = "Create an entity for when your anima patch is ready to be replaced.",
-			section = farmingPatchesSection,
-			position = 216
-	)
-	default boolean animaPatch() {
-		return false;
+	default boolean farmingTickOffset() {
+		return true;
 	}
 }

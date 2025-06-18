@@ -4,16 +4,19 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 
+import com.homeassistant.classes.StatusEffect;
 import com.homeassistant.enums.PatchStatus;
 import com.homeassistant.enums.DailyTask;
 import com.homeassistant.runelite.farming.*;
 import com.homeassistant.runelite.hunter.BirdHouseTracker;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
-import net.runelite.api.Client;
-import net.runelite.api.GameState;
+import net.runelite.api.*;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.Notifier;
@@ -25,12 +28,13 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.timetracking.TimeTrackingConfig;
+import net.runelite.client.util.Text;
 import okhttp3.*;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 @Slf4j
 @PluginDescriptor(
@@ -79,7 +83,22 @@ public class HomeassistantPlugin extends Plugin
 	private final Map<DailyTask, Integer> dailyStatuses = new EnumMap<>(DailyTask.class);
 	private final Map<DailyTask, Integer> previousDailyStatuses = new EnumMap<>(DailyTask.class);
 
+	private int currentHealth = 0;
+	private int currentPrayer = 0;
+	private int currentSpecialAttack = 0;
+	private int currentRunEnergy = 0;
+	private List<StatusEffect> currentStatusEffects = new ArrayList<>();
+	private int previousHealth = 0;
+	private int previousPrayer = 0;
+	private int previousSpecialAttack = 0;
+	private int previousRunEnergy = 0;
+	private List<StatusEffect> previousStatusEffects = new ArrayList<>();
+
 	private boolean isLoggingIn = false;
+
+	private boolean waitingForBattlestavesPurchase = false;
+	private long battlestaffWatchStart = 0;
+	private static final int BATTLESTAFF_WATCH_DURATION_MS = 30_000;
 
 	@Override
 	protected void startUp() throws Exception
@@ -217,12 +236,87 @@ public class HomeassistantPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		if (event.getType() == ChatMessageType.MESBOX &&
+				event.getMessage().equals("Bert delivers the sand to your bank."))
+		{
+			dailyStatuses.put(DailyTask.SAND, 1);
+			updateAllEntities();
+		}
+
+//		Check if the player attempts to buy battlestaves from Zaff, if so check for 30 seconds if the player gains them
+		String message = Text.removeTags(event.getMessage());
+		if (message.contains("discounted battlestaves"))
+		{
+			waitingForBattlestavesPurchase = true;
+			battlestaffWatchStart = System.currentTimeMillis();
+			log.info("Detected battlestaff purchase prompt, starting 30s watch window.");
+		}
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
+	{
+//		Make sure this doesn't constantly run, only run when the chatbox is detected
+		if (!waitingForBattlestavesPurchase)
+		{
+			return;
+		}
+
+		// Check timeout
+		if (System.currentTimeMillis() - battlestaffWatchStart > BATTLESTAFF_WATCH_DURATION_MS)
+		{
+			waitingForBattlestavesPurchase = false;
+			log.info("Battlestaff watch window expired.");
+			return;
+		}
+
+		if (event.getContainerId() == InterfaceID.INVENTORY)
+		{
+			ItemContainer container = event.getItemContainer();
+			if (container == null) return;
+
+			boolean purchased = false;
+			for (Item item : container.getItems())
+			{
+				if (item.getId() == ItemID.BATTLESTAFF)
+				{
+					if (item.getQuantity() > 15){
+						purchased = true;
+					}
+				}
+			}
+
+			if (purchased)
+			{
+				dailyStatuses.put(DailyTask.STAVES, 1);
+				waitingForBattlestavesPurchase = false;
+				updateAllEntities();
+			}
+		}
+	}
+
+	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (isLoggingIn){
+		if (isLoggingIn && config.dailies()){
 			isLoggingIn = false;
 			checkAllDailies();
 		}
+
+		if (!config.playerRunEnergy() && !config.playerHealth() && !config.playerPrayer() && !config.playerSpecialAttack()){
+			return;
+		}
+
+		final Player localPlayer = client.getLocalPlayer();
+
+		if (localPlayer == null){
+			return;
+		}
+
+		checkCurrentStats();
+		updateAllEntities();
 	}
 
 	private void updateAllEntities() {
@@ -233,12 +327,6 @@ public class HomeassistantPlugin extends Plugin
 
 		List<Map<String, Object>> entities = new ArrayList<>();
 
-		for (Tab tab : Tab.values()) {
-			if (getConfigFromTab(tab)) {
-				nextFarmingCompletionTimes.put(tab, farmingTracker.getCompletionTime(tab));
-			}
-		}
-
 		if (config.birdHouses()) {
 			nextBirdhouseCompletionTime = birdHouseTracker.getCompletionTime();
 		}
@@ -247,32 +335,82 @@ public class HomeassistantPlugin extends Plugin
 			nextFarmingContractCompletionTime = farmingContractManager.getCompletionTime();
 		}
 
-		// Farming Patches
-		for (Tab tab : Tab.values()) {
-			if (getConfigFromTab(tab)) {
-				if (!Objects.equals(previousFarmingCompletionTimes.get(tab), nextFarmingCompletionTimes.get(tab))) {
-					String entityId = generateFarmingPatchEntityId(tab);
-					if (entityId == null) continue;
+		if(config.farmingPatches()) {
+			for (Tab tab : Tab.values()) {
+				nextFarmingCompletionTimes.put(tab, farmingTracker.getCompletionTime(tab));
+			}
+		}
+		try {
+			// Farming Patches
+			if(config.farmingPatches()) {
+				for (Tab tab : Tab.values()) {
+					if (!Objects.equals(previousFarmingCompletionTimes.get(tab), nextFarmingCompletionTimes.get(tab))) {
+						String entityId = generateFarmingPatchEntityId(tab);
+						if (entityId == null) continue;
 
-					Map<String, Object> attributes = new HashMap<>();
-					attributes.put("entity_id", entityId);
+						Map<String, Object> attributes = new HashMap<>();
+						attributes.put("entity_id", entityId);
 
-					long completionTime = nextFarmingCompletionTimes.get(tab);
-					PatchStatus patchStatus = PatchStatus.READY;
+						long completionTime = nextFarmingCompletionTimes.get(tab);
+						PatchStatus patchStatus = PatchStatus.READY;
 
-					if (completionTime > 0) {
-						patchStatus = PatchStatus.IN_PROGRESS;
-						attributes.put("completion_time", Instant.ofEpochSecond(completionTime).toString());
-					} else if (completionTime == -1) {
-						patchStatus = PatchStatus.NEVER_PLANTED;
+						if (completionTime > 0) {
+							patchStatus = PatchStatus.IN_PROGRESS;
+							attributes.put("completion_time", Instant.ofEpochSecond(completionTime).toString());
+						} else if (completionTime == -1) {
+							patchStatus = PatchStatus.NEVER_PLANTED;
+						}
+
+						attributes.put("status", patchStatus.getName());
+
+						entities.add(attributes); // ✅ add to array
+						previousFarmingCompletionTimes.put(tab, nextFarmingCompletionTimes.get(tab));
 					}
-
-					attributes.put("status", patchStatus.getName());
-
-					entities.add(attributes); // ✅ add to array
-					previousFarmingCompletionTimes.put(tab, nextFarmingCompletionTimes.get(tab));
 				}
 			}
+
+			// Farming Contract
+			if(config.farmingContract()) {
+				if (previousFarmingContractCompletionTime != nextFarmingContractCompletionTime) {
+					String entityId = generateFarmingContractEntityId();
+					if (entityId != null) {
+
+						Map<String, Object> attributes = new HashMap<>();
+						attributes.put("entity_id", entityId);
+						attributes.put("status", PatchStatus.IN_PROGRESS.getName());
+						String contractName = farmingContractManager.getContractName();
+						Tab tab = farmingContractManager.getContractTab();
+						if (tab != null){
+							try {
+								attributes.put("patch_type", tab.name().toLowerCase());
+								attributes.put("crop_type", contractName);
+							}catch (NullPointerException e){
+								log.debug("Error getting contract name or tab: {}", e.getMessage());
+							}
+
+							log.info("Farming contract completion time: {}", nextFarmingContractCompletionTime);
+							PatchStatus patchStatus = PatchStatus.READY;
+							if (nextFarmingContractCompletionTime > 0) {
+								patchStatus = PatchStatus.IN_PROGRESS;
+								if(nextFarmingContractCompletionTime == Long.MAX_VALUE){
+									patchStatus = PatchStatus.OTHER;
+								} else {
+									//				log.info("Farming contract completion time: {}", Instant.ofEpochSecond(completionTime).toString());
+									attributes.put("completion_time", Instant.ofEpochSecond(nextFarmingContractCompletionTime).toString());
+								}
+							}else if(nextFarmingContractCompletionTime == -1){
+								patchStatus = PatchStatus.NEVER_PLANTED;
+							}
+							attributes.put("status", patchStatus.getName());
+
+							entities.add(attributes); // ✅ add to array
+							previousFarmingContractCompletionTime = nextFarmingContractCompletionTime;
+						}
+					}
+				}
+			}
+		} catch (Exception e){
+			log.error(e.getMessage());
 		}
 
 		// Birdhouse
@@ -289,59 +427,80 @@ public class HomeassistantPlugin extends Plugin
 			}
 		}
 
-		// Farming Contract
-		if (previousFarmingContractCompletionTime != nextFarmingContractCompletionTime) {
-			String entityId = generateFarmingContractEntityId();
-			if (entityId != null) {
-
-				Map<String, Object> attributes = new HashMap<>();
-				attributes.put("entity_id", entityId);
-				attributes.put("status", PatchStatus.IN_PROGRESS.getName());
-				String contractName = farmingContractManager.getContractName();
-				Tab tab = farmingContractManager.getContractTab();
-				if (tab != null){
-					try {
-						attributes.put("patch_type", tab.name().toLowerCase());
-						attributes.put("crop_type", contractName);
-					}catch (NullPointerException e){
-						log.debug("Error getting contract name or tab: {}", e.getMessage());
-					}
-
-					log.info("Farming contract completion time: {}", nextFarmingContractCompletionTime);
-					PatchStatus patchStatus = PatchStatus.READY;
-					if (nextFarmingContractCompletionTime > 0) {
-						patchStatus = PatchStatus.IN_PROGRESS;
-						if(nextFarmingContractCompletionTime == Long.MAX_VALUE){
-							patchStatus = PatchStatus.OTHER;
-						} else {
-//				log.info("Farming contract completion time: {}", Instant.ofEpochSecond(completionTime).toString());
-							attributes.put("completion_time", Instant.ofEpochSecond(nextFarmingContractCompletionTime).toString());
+//		Dailies (sand, staves etc)
+		if(config.dailies()) {
+			try {
+				dailyStatuses.forEach((name, status) -> {
+					if (!previousDailyStatuses.get(name).equals(status)) {
+						String entityId = generateDailyEntityId(name.getId());
+						if (entityId == null) {
+							return;
 						}
-					}else if(nextFarmingContractCompletionTime == -1){
-						patchStatus = PatchStatus.NEVER_PLANTED;
-					}
-					attributes.put("status", patchStatus.getName());
 
-					entities.add(attributes); // ✅ add to array
-					previousFarmingContractCompletionTime = nextFarmingContractCompletionTime;
-				}
+						Map<String, Object> attributes = new HashMap<>();
+						attributes.put("entity_id", entityId);
+						attributes.put("state", status);
+						entities.add(attributes);
+					}
+				});
+				resetPreviousDailies();
+			} catch (Exception e) {
+				log.error(e.getMessage());
 			}
 		}
 
-		dailyStatuses.forEach((name, status) -> {
-			if (!previousDailyStatuses.get(name).equals(status)) {
-				String entityId = generateDailyEntityId(name.getId());
-				if (entityId == null){
-					return;
-				}
+//		Player stats
+		if(currentHealth != previousHealth && config.playerHealth()){
+			String entityId = String.format("sensor.runelite_%s_health", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("current_health", currentHealth);
+			entities.add(attributes);
+		}
+		if (currentPrayer != previousPrayer && config.playerPrayer())
+		{
+			String entityId = String.format("sensor.runelite_%s_prayer", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("current_prayer", currentPrayer);
+			entities.add(attributes);
+		}
+		if (currentSpecialAttack != previousSpecialAttack && config.playerSpecialAttack())
+		{
+			String entityId = String.format("sensor.runelite_%s_special_attack", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("current_special_attack", currentSpecialAttack);
+			entities.add(attributes);
+		}
+		if (currentRunEnergy != previousRunEnergy && config.playerRunEnergy())
+		{
+			String entityId = String.format("sensor.runelite_%s_run_energy", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("current_run_energy", currentRunEnergy);
+			entities.add(attributes);
+		}
+		if (!currentStatusEffects.equals(previousStatusEffects) && config.playerStatusEffects())
+		{
+			String entityId = String.format("sensor.runelite_%s_status_effects", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
 
-				Map<String, Object> attributes = new HashMap<>();
-				attributes.put("entity_id", entityId);
-				attributes.put("state", status);
-				entities.add(attributes);
-			}
-		});
-		resetPreviousDailies();
+			// Convert status effects to a serializable list of maps or strings
+			List<Map<String, Object>> effectList = currentStatusEffects.stream()
+					.map(effect -> {
+						Map<String, Object> map = new HashMap<>();
+						map.put("name", effect.name);
+						map.put("number", effect.number);
+						map.put("time", effect.time);
+						return map;
+					})
+					.collect(Collectors.toList());
+
+			attributes.put("current_status_effects", effectList);
+			entities.add(attributes);
+		}
 
 		if(entities.isEmpty()){
 			return;
@@ -350,7 +509,6 @@ public class HomeassistantPlugin extends Plugin
 		Map<String, Object> payload = new HashMap<>();
 		payload.put("entities", entities);
 
-
 		Gson gson = this.gson.newBuilder().create();
 		String jsonPayload = gson.toJson(payload);
 
@@ -358,15 +516,17 @@ public class HomeassistantPlugin extends Plugin
 		sendPayloadToHomeAssistant(jsonPayload);
 
 
-		int offset = configManager.getRSProfileConfiguration(TimeTrackingConfig.CONFIG_GROUP, TimeTrackingConfig.FARM_TICK_OFFSET, int.class);
-		offset = offset * -1;
+		if(config.farmingTickOffset()) {
+			int offset = configManager.getRSProfileConfiguration(TimeTrackingConfig.CONFIG_GROUP, TimeTrackingConfig.FARM_TICK_OFFSET, int.class);
+			offset = offset * -1;
 
-		if (offset != farmingTickOffset) {
-			farmingTickOffset = offset;
-			Map<String, Object> farmingTickAttributes = new HashMap<>();
-			farmingTickAttributes.put("username", username);
-			farmingTickAttributes.put("farming_tick_offset", offset);
-			sendPayloadToHomeAssistant(gson.toJson(farmingTickAttributes), "/services/runelite/set_farming_tick_offset");
+			if (offset != farmingTickOffset) {
+				farmingTickOffset = offset;
+				Map<String, Object> farmingTickAttributes = new HashMap<>();
+				farmingTickAttributes.put("username", username);
+				farmingTickAttributes.put("farming_tick_offset", offset);
+				sendPayloadToHomeAssistant(gson.toJson(farmingTickAttributes), "/services/runelite/set_farming_tick_offset");
+			}
 		}
 	}
 
@@ -542,52 +702,6 @@ public class HomeassistantPlugin extends Plugin
 				response.close();
 			}
 		});
-	}
-
-	private boolean getConfigFromTab(Tab tab) {
-		switch (tab) {
-			case BUSH:
-				return config.bushPatches();
-			case HERB:
-				return config.herbPatches();
-			case ALLOTMENT:
-				return config.allotmentPatches();
-			case FLOWER:
-				return config.flowerPatches();
-			case TREE:
-				return config.treePatches();
-			case FRUIT_TREE:
-				return config.fruitTreePatches();
-			case HOPS:
-				return config.hopsPatches();
-			case SPECIAL:
-			case MUSHROOM:
-				return config.mushroomPatch();
-			case BELLADONNA:
-				return config.belladonnaPatch();
-			case BIG_COMPOST:
-				return config.giantCompostBin();
-			case SEAWEED:
-				return config.seaweedPatches();
-			case CALQUAT:
-				return config.calquatPatch();
-			case CELASTRUS:
-				return config.celastrusPatch();
-			case HARDWOOD:
-				return config.hardwoodPatches();
-			case REDWOOD:
-				return config.redwoodPatch();
-			case CACTUS:
-				return config.cactusPatches();
-			case HESPORI:
-				return config.hespori();
-			case CRYSTAL:
-				return config.crystalPatch();
-			case ANIMA:
-				return config.animaPatch();
-			default:
-				return false;
-		}
 	}
 
 	private String generateFarmingPatchEntityId(Tab tab) {
@@ -775,5 +889,56 @@ public class HomeassistantPlugin extends Plugin
 		} else {
 			dailyStatuses.put(DailyTask.DYNAMITE, 1);
 		}
+	}
+
+	private void checkCurrentStats(){
+		previousHealth = currentHealth;
+		previousPrayer = currentPrayer;
+		previousRunEnergy = currentRunEnergy;
+		previousSpecialAttack = currentSpecialAttack;
+		previousStatusEffects = new ArrayList<>();
+		for (StatusEffect value : currentStatusEffects ){
+			previousStatusEffects.add(value.copy());
+		}
+
+		if(config.playerStatusEffects()){
+			currentStatusEffects = new ArrayList<>();
+
+			int poison = client.getVarpValue(102);
+			boolean isPoisoned = false;
+			boolean isVenomed = false;
+			int damage = 0;
+
+			if (poison > 0 && poison <= 100)
+			{
+				damage = (int) Math.ceil(poison / 5.0f);
+				isPoisoned = true;
+
+			}
+			else if (poison >= 1_000_000)
+			{
+				damage = Math.min(20, (poison - 999_997) * 2);
+				isVenomed = true;
+			}
+
+			if(isPoisoned || isVenomed){
+				StatusEffect statusEffect = new StatusEffect();
+				statusEffect.number = damage;
+				statusEffect.name = isPoisoned ? "Poison" : "Venom";
+				currentStatusEffects.add(statusEffect);
+			}
+		}
+
+		if(config.playerRunEnergy())
+			currentRunEnergy = client.getEnergy() / 100;
+
+		if(config.playerSpecialAttack())
+			currentSpecialAttack = client.getVarpValue(300) / 10;
+
+		if(config.playerHealth())
+			currentHealth = client.getBoostedSkillLevel(Skill.HITPOINTS);
+
+		if(config.playerPrayer())
+			currentPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
 	}
 }
