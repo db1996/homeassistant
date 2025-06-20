@@ -15,8 +15,7 @@ import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.Notifier;
@@ -98,7 +97,8 @@ public class HomeassistantPlugin extends Plugin
 
 	private boolean waitingForBattlestavesPurchase = false;
 	private long battlestaffWatchStart = 0;
-	private static final int BATTLESTAFF_WATCH_DURATION_MS = 30_000;
+	private static final int BATTLESTAFF_WATCH_DURATION_MS = 120_000;
+	private static final int BATTLESTAFF_NOTED_ID = 1392;
 
 	@Override
 	protected void startUp() throws Exception
@@ -258,6 +258,7 @@ public class HomeassistantPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
+		log.debug("itemcontainer changed {}", event);
 //		Make sure this doesn't constantly run, only run when the chatbox is detected
 		if (!waitingForBattlestavesPurchase)
 		{
@@ -272,15 +273,17 @@ public class HomeassistantPlugin extends Plugin
 			return;
 		}
 
-		if (event.getContainerId() == InterfaceID.INVENTORY)
+		if (event.getContainerId() == InventoryID.INV)
 		{
 			ItemContainer container = event.getItemContainer();
 			if (container == null) return;
 
+			Item[] items = container.getItems();
 			boolean purchased = false;
-			for (Item item : container.getItems())
+
+			for (Item item : items)
 			{
-				if (item.getId() == ItemID.BATTLESTAFF)
+				if (item.getId() == BATTLESTAFF_NOTED_ID)
 				{
 					if (item.getQuantity() > 15){
 						purchased = true;
@@ -288,6 +291,7 @@ public class HomeassistantPlugin extends Plugin
 				}
 			}
 
+			log.info("Battlestaff watch window purchased., {}", purchased);
 			if (purchased)
 			{
 				dailyStatuses.put(DailyTask.STAVES, 1);
