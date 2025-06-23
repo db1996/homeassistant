@@ -100,6 +100,11 @@ public class HomeassistantPlugin extends Plugin
 	private static final int BATTLESTAFF_WATCH_DURATION_MS = 120_000;
 	private static final int BATTLESTAFF_NOTED_ID = 1392;
 
+	private boolean previousIsOnline = false;
+	private int previousOnlineWorld = -1;
+	private boolean isOnline = false;
+	private int onlineWorld = -1;
+
 	@Override
 	protected void startUp() throws Exception
 	{
@@ -203,13 +208,23 @@ public class HomeassistantPlugin extends Plugin
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged) {
-		if (gameStateChanged.getGameState() == GameState.LOGGING_IN){
+		GameState gameState = gameStateChanged.getGameState();
+		if(gameState == GameState.CONNECTION_LOST || gameState == GameState.LOGIN_SCREEN){
+			isOnline = false;
+			onlineWorld = -1;
+			updateAllEntities();
+		}
+
+		if (gameState == GameState.LOGGING_IN){
 			isLoggingIn = true;
 		}
 
-		if (gameStateChanged.getGameState() != GameState.LOGGED_IN) {
+		if (gameState != GameState.LOGGED_IN) {
 			return;
 		}
+
+		isOnline = true;
+		onlineWorld = client.getWorld();
 		resetCompletionTimes();
 		birdHouseTracker.loadFromConfig();
 		farmingTracker.loadCompletionTimes();
@@ -454,6 +469,16 @@ public class HomeassistantPlugin extends Plugin
 		}
 
 //		Player stats
+		if(isOnline != previousIsOnline || onlineWorld != previousOnlineWorld) {
+			String entityId = String.format("sensor.runelite_%s_player_status", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("is_online", isOnline);
+			attributes.put("world", onlineWorld);
+			entities.add(attributes);
+			previousIsOnline = isOnline;
+			previousOnlineWorld = onlineWorld;
+		}
 		if(currentHealth != previousHealth && config.playerHealth()){
 			String entityId = String.format("sensor.runelite_%s_health", getUsername());
 			Map<String, Object> attributes = new HashMap<>();
