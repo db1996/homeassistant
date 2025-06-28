@@ -188,4 +188,27 @@ public interface HomeassistantConfig extends Config
 	default boolean farmingTickOffset() {
 		return true;
 	}
+
+	@ConfigItem(
+			keyName = "aggression_timer",
+			name = "Aggression timer",
+			description = "Updates aggression timer updates to homeassistant, this includes status, if applicable time and ticks",
+			section = miscellaneousSection,
+			position = 303
+	)
+
+	default boolean aggressionTimer() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "aggression_timer_delay",
+			name = "Aggression timer delay (ticks)",
+			description = "Only updates the aggression timer every x ticks.",
+			section = miscellaneousSection,
+			position = 303
+	)
+	default int aggressionTimerDelay() {
+		return 50;
+	}
 }

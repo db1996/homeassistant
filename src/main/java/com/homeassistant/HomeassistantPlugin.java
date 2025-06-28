@@ -4,7 +4,11 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 
+import com.homeassistant.classes.AggressionData;
+import com.homeassistant.classes.AggressionEvent;
+import com.homeassistant.classes.AggressionTracker;
 import com.homeassistant.classes.StatusEffect;
+import com.homeassistant.enums.AggressionStatus;
 import com.homeassistant.enums.PatchStatus;
 import com.homeassistant.enums.DailyTask;
 import com.homeassistant.runelite.farming.*;
@@ -21,6 +25,7 @@ import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
@@ -33,6 +38,7 @@ import okhttp3.*;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -64,10 +70,13 @@ public class HomeassistantPlugin extends Plugin
 	private Notifier notifier;
 	@Inject
 	private OkHttpClient okHttpClient;
+	@Inject
+	private EventBus eventBus;
 
 	private BirdHouseTracker birdHouseTracker;
 	private FarmingTracker farmingTracker;
 	private FarmingContractManager farmingContractManager;
+	private AggressionTracker aggressionTracker;
 
 	private int farmingTickOffset = 0;
 	private final Map<Tab, Long> previousFarmingCompletionTimes = new EnumMap<>(Tab.class);
@@ -105,6 +114,9 @@ public class HomeassistantPlugin extends Plugin
 	private boolean isOnline = false;
 	private int onlineWorld = -1;
 
+	private AggressionData aggressionData = new AggressionData();
+	private AggressionData previousAggressionData = new AggressionData();
+
 	@Override
 	protected void startUp() throws Exception
 	{
@@ -112,7 +124,8 @@ public class HomeassistantPlugin extends Plugin
 		resetDailies();
 		resetCompletionTimes();
 		initializeTrackers();
-
+		aggressionTracker = new AggressionTracker(client, eventBus, config);
+		eventBus.register(aggressionTracker);
 		isLoggingIn = true;
 	}
 
@@ -140,6 +153,7 @@ public class HomeassistantPlugin extends Plugin
 	@Override
 	protected void shutDown() throws Exception
 	{
+		eventBus.unregister(aggressionTracker);
 		resetDailies();
 		log.info("Homeassistant stopped!");
 	}
@@ -151,6 +165,31 @@ public class HomeassistantPlugin extends Plugin
         return configManager.getConfig(HomeassistantConfig.class);
 	}
 
+	// Only runs as often as the user has setup in the settings
+	@Subscribe
+	public void onAggroTick(AggressionEvent.AggroTick event)
+	{
+		int ticks = event.getTicksLeft();
+		int seconds = event.getSecondsLeft();
+
+		aggressionData.seconds = seconds;
+		aggressionData.ticks = ticks;
+		aggressionData.status = AggressionStatus.ACTIVE;
+		updateAllEntities();
+
+		log.debug("Aggression timer: {} ticks left, {}", seconds, ticks);
+	}
+
+	@Subscribe
+	public void onAggroEnded(AggressionEvent.AggroEnded event)
+	{
+		log.debug("Aggression timer ended");
+		aggressionData.status = AggressionStatus.SAFE;
+		aggressionData.ticks = 0;
+		aggressionData.seconds = 0;
+		updateAllEntities();
+		// notify HA or clear status
+	}
 
 	private void initializeTrackers() {
 		TimeTrackingConfig timeTrackingConfig = configManager.getConfig(TimeTrackingConfig.class);
@@ -225,10 +264,13 @@ public class HomeassistantPlugin extends Plugin
 
 		isOnline = true;
 		onlineWorld = client.getWorld();
+
 		resetCompletionTimes();
-		birdHouseTracker.loadFromConfig();
-		farmingTracker.loadCompletionTimes();
-		farmingContractManager.loadContractFromConfig();
+
+		checkFarmingPatches();
+		checkFarmingContract();
+		checkBirdhouses();
+
 		updateAllEntities();
 	}
 
@@ -242,10 +284,9 @@ public class HomeassistantPlugin extends Plugin
 		{
 			testHomeAssistant();
         }
-		birdHouseTracker.loadFromConfig();
-		farmingTracker.setIgnoreFarmingGuild(config.ignoreFarmingGuild());
-		farmingTracker.loadCompletionTimes();
-		farmingContractManager.loadContractFromConfig();
+		checkFarmingPatches();
+		checkFarmingContract();
+		checkBirdhouses();
 
 		updateAllEntities();
 	}
@@ -346,19 +387,6 @@ public class HomeassistantPlugin extends Plugin
 
 		List<Map<String, Object>> entities = new ArrayList<>();
 
-		if (config.birdHouses()) {
-			nextBirdhouseCompletionTime = birdHouseTracker.getCompletionTime();
-		}
-
-		if (config.farmingContract()) {
-			nextFarmingContractCompletionTime = farmingContractManager.getCompletionTime();
-		}
-
-		if(config.farmingPatches()) {
-			for (Tab tab : Tab.values()) {
-				nextFarmingCompletionTimes.put(tab, farmingTracker.getCompletionTime(tab));
-			}
-		}
 		try {
 			// Farming Patches
 			if(config.farmingPatches()) {
@@ -466,6 +494,25 @@ public class HomeassistantPlugin extends Plugin
 			} catch (Exception e) {
 				log.error(e.getMessage());
 			}
+		}
+
+		// Aggression timer
+		if(!previousAggressionData.isEquals(aggressionData) && config.aggressionTimer()){
+			String entityId = String.format("sensor.runelite_%s_aggression", getUsername());
+			Map<String, Object> attributes = new HashMap<>();
+			attributes.put("entity_id", entityId);
+			attributes.put("status", aggressionData.status.getId());
+			attributes.put("seconds", aggressionData.seconds);
+			attributes.put("ticks", aggressionData.ticks);
+			entities.add(attributes);
+
+//			make sure it's not a reference
+			previousAggressionData.seconds = aggressionData.seconds;
+			previousAggressionData.ticks = aggressionData.ticks;
+			previousAggressionData.status = aggressionData.status;
+
+			log.debug("aggression changed data previous {}, {}, {}", previousAggressionData.status, previousAggressionData.seconds, previousAggressionData.ticks);
+			log.debug("aggression changed data {}, {}, {}", aggressionData.status, aggressionData.seconds, aggressionData.ticks);
 		}
 
 //		Player stats
@@ -594,6 +641,30 @@ public class HomeassistantPlugin extends Plugin
 				response.close();
 			}
 		});
+	}
+
+	private void checkFarmingPatches() {
+		if(config.farmingPatches()) {
+			farmingTracker.setIgnoreFarmingGuild(config.ignoreFarmingGuild());
+			farmingTracker.loadCompletionTimes();
+			for (Tab tab : Tab.values()) {
+				nextFarmingCompletionTimes.put(tab, farmingTracker.getCompletionTime(tab));
+			}
+		}
+	}
+
+	private void checkBirdhouses() {
+		if (config.birdHouses()) {
+			birdHouseTracker.loadFromConfig();
+			nextBirdhouseCompletionTime = birdHouseTracker.getCompletionTime();
+		}
+	}
+
+	private void checkFarmingContract() {
+		if (config.farmingContract()) {
+			farmingContractManager.loadContractFromConfig();
+			nextFarmingContractCompletionTime = farmingContractManager.getCompletionTime();
+		}
 	}
 
 	private void testHomeAssistant()
