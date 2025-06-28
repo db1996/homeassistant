@@ -114,8 +114,8 @@ public class HomeassistantPlugin extends Plugin
 	private boolean isOnline = false;
 	private int onlineWorld = -1;
 
-	private AggressionData aggressionData = new AggressionData();
-	private AggressionData previousAggressionData = new AggressionData();
+	private final AggressionData aggressionData = new AggressionData();
+	private final AggressionData previousAggressionData = new AggressionData();
 
 	@Override
 	protected void startUp() throws Exception
@@ -516,7 +516,7 @@ public class HomeassistantPlugin extends Plugin
 		}
 
 //		Player stats
-		if(isOnline != previousIsOnline || onlineWorld != previousOnlineWorld) {
+		if((isOnline != previousIsOnline || onlineWorld != previousOnlineWorld) && config.playerOnlineStatus()) {
 			String entityId = String.format("sensor.runelite_%s_player_status", getUsername());
 			Map<String, Object> attributes = new HashMap<>();
 			attributes.put("entity_id", entityId);

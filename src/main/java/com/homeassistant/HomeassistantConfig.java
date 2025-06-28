@@ -113,11 +113,22 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "player_online_status",
+			name = "Player online status",
+			description = "Update player online status, updates the status and world",
+			section = entitiesSection,
+			position = 204
+	)
+	default boolean playerOnlineStatus() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "player_health",
 			name = "Player health",
 			description = "Update player health, this can result in a lot of calls",
 			section = entitiesSection,
-			position = 204
+			position = 205
 	)
 	default boolean playerHealth() {
 		return false;
@@ -128,7 +139,7 @@ public interface HomeassistantConfig extends Config
 			name = "Player prayer",
 			description = "Update player prayer, this can result in a lot of calls",
 			section = entitiesSection,
-			position = 205
+			position = 206
 	)
 	default boolean playerPrayer() {
 		return false;
@@ -139,7 +150,7 @@ public interface HomeassistantConfig extends Config
 			name = "Player special attack %",
 			description = "Update player special attack",
 			section = entitiesSection,
-			position = 206
+			position = 207
 	)
 	default boolean playerSpecialAttack() {
 		return false;
@@ -150,7 +161,7 @@ public interface HomeassistantConfig extends Config
 			name = "Player run energy %",
 			description = "Update player run energy, this can result in a lot of calls",
 			section = entitiesSection,
-			position = 206
+			position = 208
 	)
 	default boolean playerRunEnergy() {
 		return false;
@@ -161,7 +172,7 @@ public interface HomeassistantConfig extends Config
 			name = "Player status effects",
 			description = "Will update for poison and venom (more soon)",
 			section = entitiesSection,
-			position = 206
+			position = 209
 	)
 	default boolean playerStatusEffects() {
 		return false;
