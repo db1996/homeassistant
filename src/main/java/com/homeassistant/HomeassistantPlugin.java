@@ -52,6 +52,21 @@ public class HomeassistantPlugin extends Plugin
 	private static final int SAND_QUEST_COMPLETE = 160;
 	private static final int ONE_DAY = 86400000;
 
+	private static final List<Tab> IGNORE_TABS = List.of(
+		Tab.GRAPE,
+		Tab.TIME_OFFSET,
+		Tab.ANIMA,
+		Tab.SPECIAL,
+		Tab.BELLADONNA,
+		Tab.CALQUAT,
+		Tab.CELASTRUS,
+		Tab.CRYSTAL,
+		Tab.BIRD_HOUSE,
+		Tab.OVERVIEW,
+		Tab.HOPS,
+		Tab.CLOCK
+	);
+
 	@Inject
 	private Client client;
 	@Inject
@@ -239,6 +254,9 @@ public class HomeassistantPlugin extends Plugin
 
 	private void resetCompletionTimes(){
 		for (Tab tab : Tab.values()) {
+			if(IGNORE_TABS.contains(tab)){
+				continue;
+			}
 			previousFarmingCompletionTimes.put(tab, -2L);
 		}
 		previousBirdhouseCompletionTime = -2L;
@@ -392,6 +410,9 @@ public class HomeassistantPlugin extends Plugin
 			if(config.farmingPatches()) {
 				for (Tab tab : Tab.values()) {
 					if (!Objects.equals(previousFarmingCompletionTimes.get(tab), nextFarmingCompletionTimes.get(tab))) {
+						if(IGNORE_TABS.contains(tab)){
+							continue;
+						}
 						String entityId = generateFarmingPatchEntityId(tab);
 						if (entityId == null) continue;
 
@@ -648,6 +669,9 @@ public class HomeassistantPlugin extends Plugin
 			farmingTracker.setIgnoreFarmingGuild(config.ignoreFarmingGuild());
 			farmingTracker.loadCompletionTimes();
 			for (Tab tab : Tab.values()) {
+				if(IGNORE_TABS.contains(tab)){
+					continue;
+				}
 				nextFarmingCompletionTimes.put(tab, farmingTracker.getCompletionTime(tab));
 			}
 		}
@@ -807,7 +831,7 @@ public class HomeassistantPlugin extends Plugin
 	private String generateFarmingPatchEntityId(Tab tab) {
 		try {
 			if(tab == Tab.BIG_COMPOST){
-				return String.format("sensor.runelite_%s_%s", getUsername(), tab.name().toLowerCase());
+				return String.format("sensor.runelite_%s_compost_bin", getUsername());
 			}
 			return String.format("sensor.runelite_%s_%s_patch", getUsername(), tab.name().toLowerCase());
 		}catch (NullPointerException e){
