@@ -1,7 +1,10 @@
-package com.homeassistant.classes;
+package com.homeassistant.trackers;
 
 import com.homeassistant.HomeassistantConfig;
+import com.homeassistant.enums.AggressionStatus;
+import com.homeassistant.trackers.events.UpdateEntitiesEvent;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
@@ -12,7 +15,11 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.util.*;
 
+@Slf4j
+@Singleton
 public class AggressionTracker
 {
     private static final int AGGRESSION_TIMEOUT_TICKS = 1000; // ~10 minutes (600 seconds)
@@ -36,6 +43,7 @@ public class AggressionTracker
 
     public int previousFiredEvent;
 
+    @Inject
     public AggressionTracker(Client client, EventBus eventBus, HomeassistantConfig config)
     {
         this.client = client;
@@ -86,28 +94,55 @@ public class AggressionTracker
             if (ticksLeft > 0)
             {
                 ticksLeft--;
-
-                // Check if we just became active
-                if (!wasActive)
-                {
-                    active = true;
-                    wasActive = true;
-                    previousFiredEvent = 0;
-                    eventBus.post(new AggressionEvent.AggroStarted());
-                }
-                if(previousFiredEvent == 0){
-                    previousFiredEvent = config.aggressionTimerDelay();
-                    eventBus.post(new AggressionEvent.AggroTick(ticksLeft));
+                if(previousFiredEvent == 0 && ticksLeft > 0){
+                    aggroTick();
                 }
 
                 if (ticksLeft == 0)
                 {
-                    // Timer expired - NPCs are no longer aggressive
-                    active = false;
-                    eventBus.post(new AggressionEvent.AggroEnded());
+                    aggroEnded();
                 }
             }
         }
+    }
+
+    private void aggroTick(){
+        if(previousFiredEvent == 0) {
+            previousFiredEvent = config.aggressionTimerDelay();
+
+            List<Map<String, Object>> entities = new ArrayList<>();
+            active = true;
+            wasActive = true;
+
+            int seconds = (int)(ticksLeft * 0.6f);
+
+            String entityId = String.format("sensor.runelite_%s_aggression", getUsername());
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("entity_id", entityId);
+            attributes.put("status", AggressionStatus.ACTIVE.getId());
+            attributes.put("seconds", seconds);
+            attributes.put("ticks", ticksLeft);
+            entities.add(attributes);
+
+            eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
+        }
+    }
+
+    private void aggroEnded(){
+        previousFiredEvent = config.aggressionTimerDelay();
+
+        List<Map<String, Object>> entities = new ArrayList<>();
+        active = false;
+
+        String entityId = String.format("sensor.runelite_%s_aggression", getUsername());
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("entity_id", entityId);
+        attributes.put("status", AggressionStatus.SAFE.getId());
+        attributes.put("seconds", 0);
+        attributes.put("ticks", 0);
+        entities.add(attributes);
+
+        eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
     }
 
     @Subscribe
@@ -122,6 +157,10 @@ public class AggressionTracker
         {
             reset();
         }
+    }
+
+    private void CheckEntities(){
+
     }
 
     private void initialize(WorldPoint location)
@@ -150,7 +189,7 @@ public class AggressionTracker
         // Only post reset event if we were previously active
         if (wasActiveBeforeReset)
         {
-            eventBus.post(new AggressionEvent.AggroReset());
+
         }
     }
 
@@ -182,38 +221,14 @@ public class AggressionTracker
         tile2 = null;
     }
 
-    /**
-     * Returns true if NPCs should be aggressive (timer is active and counting down)
-     */
-    public boolean isAggroActive()
-    {
-        return active && ticksLeft > 0;
-    }
-
-    /**
-     * Returns the number of seconds left on the aggression timer
-     */
-    public int getSecondsLeft()
-    {
-        return ticksLeft > 0 ? (int) Math.ceil(ticksLeft * 0.6) : 0;
-    }
-
-    /**
-     * Returns the current tracked tiles (for debugging purposes)
-     */
-    public String getAreaInfo()
-    {
-        if (!initialized)
-        {
-            return "Not initialized";
+    private String getUsername() {
+        try {
+            return Objects.requireNonNull(client.getLocalPlayer().getName())
+                    .toLowerCase()
+                    .replace(" ", "_");
+        } catch (NullPointerException e) {
+            log.error("Error fetching username: {}", e.getMessage());
+            return null;
         }
-
-        if (tile1 == null || tile2 == null)
-        {
-            return "Invalid tile data";
-        }
-
-        return String.format("Tile1: (%d, %d), Tile2: (%d, %d)",
-                tile1.getX(), tile1.getY(), tile2.getX(), tile2.getY());
     }
 }

@@ -179,6 +179,30 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "aggression_timer",
+			name = "Aggression timer",
+			description = "Updates aggression timer updates to homeassistant, this includes status, if applicable time and ticks",
+			section = entitiesSection,
+			position = 210
+	)
+
+	default boolean aggressionTimer() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "skill_boosts",
+			name = "Skill boosts",
+			description = "Updates all skill boosts, this includes potions and debuffs",
+			section = entitiesSection,
+			position = 210
+	)
+
+	default boolean skillBoosts() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "ignorefarmingguild",
 			name = "Ignore Farming Guild",
 			description = "Ignore patches in the farming guild when determining the next update.",
@@ -200,17 +224,6 @@ public interface HomeassistantConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(
-			keyName = "aggression_timer",
-			name = "Aggression timer",
-			description = "Updates aggression timer updates to homeassistant, this includes status, if applicable time and ticks",
-			section = miscellaneousSection,
-			position = 303
-	)
-
-	default boolean aggressionTimer() {
-		return false;
-	}
 
 	@ConfigItem(
 			keyName = "aggression_timer_delay",
@@ -221,5 +234,16 @@ public interface HomeassistantConfig extends Config
 	)
 	default int aggressionTimerDelay() {
 		return 50;
+	}
+
+	@ConfigItem(
+			keyName = "global_update_throttle",
+			name = "Global tick throttle",
+			description = "Only updates homeassistant every x ticks. 0 for every tick",
+			section = miscellaneousSection,
+			position = 304
+	)
+	default int globalUpdateThrottle() {
+		return 0;
 	}
 }
