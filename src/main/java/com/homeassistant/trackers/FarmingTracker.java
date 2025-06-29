@@ -3,12 +3,11 @@ package com.homeassistant.trackers;
 import java.time.Instant;
 import java.util.*;
 
-import com.google.gson.Gson;
 import com.homeassistant.HomeassistantConfig;
 
 import com.homeassistant.enums.PatchStatus;
 import com.homeassistant.runelite.farming.*;
-import com.homeassistant.trackers.events.UpdateEntitiesEvent;
+import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.GameStateChanged;
@@ -200,7 +199,7 @@ public class FarmingTracker {
             return;
         }
 
-        eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
+        eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
     }
 
 

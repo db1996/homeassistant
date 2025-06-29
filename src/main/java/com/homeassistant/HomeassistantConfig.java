@@ -246,4 +246,26 @@ public interface HomeassistantConfig extends Config
 	default int globalUpdateThrottle() {
 		return 0;
 	}
+
+	@ConfigItem(
+			keyName = "send_collection_log_events",
+			name = "Collection log events",
+			description = "Sends events when receiving a collection log",
+			section = miscellaneousSection,
+			position = 305
+	)
+	default boolean sendCollectionLogEvents() {
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "test_collection_log_event",
+			name = "Test clog event",
+			description = "Sends a test collection log request to your homeassistant",
+			section = miscellaneousSection,
+			position = 306
+	)
+	default boolean testCollectionLogEvent() {
+		return false;
+	}
 }

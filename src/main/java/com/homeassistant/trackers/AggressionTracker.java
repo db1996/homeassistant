@@ -2,7 +2,7 @@ package com.homeassistant.trackers;
 
 import com.homeassistant.HomeassistantConfig;
 import com.homeassistant.enums.AggressionStatus;
-import com.homeassistant.trackers.events.UpdateEntitiesEvent;
+import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -124,7 +124,7 @@ public class AggressionTracker
             attributes.put("ticks", ticksLeft);
             entities.add(attributes);
 
-            eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
+            eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
         }
     }
 
@@ -142,7 +142,7 @@ public class AggressionTracker
         attributes.put("ticks", 0);
         entities.add(attributes);
 
-        eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
+        eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
     }
 
     @Subscribe

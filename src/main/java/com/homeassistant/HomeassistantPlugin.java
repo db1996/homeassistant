@@ -6,7 +6,7 @@ import javax.inject.Inject;
 
 import com.homeassistant.trackers.*;
 import com.homeassistant.trackers.FarmingTracker;
-import com.homeassistant.trackers.events.UpdateEntitiesEvent;
+import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.GameTick;
@@ -28,6 +28,9 @@ import java.util.*;
 )
 public class HomeassistantPlugin extends Plugin
 {
+	private final boolean DEBUG_15_TICK = false;
+	private int DEBUG_CURRENT = 0;
+
 	@Inject
 	private Client client;
 	@Inject
@@ -50,6 +53,8 @@ public class HomeassistantPlugin extends Plugin
 	private FarmingTracker farmingTracker;
 	@Inject
 	private BirdhouseTracker  birdhouseTracker;
+	@Inject
+	private CollectionTracker collectionTracker;
 
 	private final Map<String,Map<String, Object>> updateSortedEntities = new HashMap<>();
 
@@ -70,6 +75,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.register(dailyTracker);
 		eventBus.register(farmingTracker);
 		eventBus.register(birdhouseTracker);
+		eventBus.register(collectionTracker);
 	}
 
 	@Override
@@ -80,6 +86,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(dailyTracker);
 		eventBus.unregister(farmingTracker);
 		eventBus.unregister(birdhouseTracker);
+		eventBus.unregister(collectionTracker);
 
 		log.info("Homeassistant stopped!");
 	}
@@ -93,17 +100,27 @@ public class HomeassistantPlugin extends Plugin
 
 /*
 	This event can be called from any tracker. It will overwrite any previous object with the same entity_id. So if a throttle is active it will always update the latest
-	onUpdate() returns List<Map<String, Object>>
+	getEntities() returns List<Map<String, Object>>
  */
 	@Subscribe
-	public void onUpdateEntities(UpdateEntitiesEvent.UpdateEntities event){
-		for(Map<String, Object> map : event.onUpdate()){
+	public void onUpdateEntities(HomeassistantEvents.UpdateEntities event){
+		for(Map<String, Object> map : event.getEntities()){
 			if(map.containsKey("entity_id")){
 				String entityId = (String) map.get("entity_id");
 				updateSortedEntities.put(entityId, map);
 			}
 		}
 		log.info("update entities received, total: {}", updateSortedEntities);
+	}
+	/**
+	 * This event can be called from any tracker. IT will immediately send a request to homeassistant, for example when a collection log notification is sent.
+	 * `String getService()` returns name of the service in homeassistant, this is everything after domain/api/services/runelite/
+	 * `Map<String, Object> getEventObj()` data to be serialized and sent to homeassistant
+     */
+	@Subscribe
+	public void onSendEvent(HomeassistantEvents.SendEvent event){
+		log.info("send event:{}, {}", event.getService(), event.getEventObj());
+		sendEventToHomeAssistant(event.getService(), event.getEventObj());
 	}
 
 	@Subscribe
@@ -120,6 +137,13 @@ public class HomeassistantPlugin extends Plugin
 
 	@Subscribe
 	public void onGameTick(GameTick event){
+		if(DEBUG_15_TICK && DEBUG_CURRENT < 15){
+			DEBUG_CURRENT++;
+
+			if(DEBUG_CURRENT == 15){
+				runDebug15Tick();
+			}
+		}
 		// If the user has a global throttled setup, it will only update once every x ticks
 		currentDelayCount++;
 		if(currentDelayCount >= config.globalUpdateThrottle()){
@@ -142,6 +166,13 @@ public class HomeassistantPlugin extends Plugin
 				sendPayloadToHomeAssistant(jsonPayload);
 			}
 		}
+	}
+
+	private void sendEventToHomeAssistant(String service, Map<String, Object> event){
+		Gson gson = this.gson.newBuilder().create();
+		String jsonPayload = gson.toJson(event);
+
+		sendPayloadToHomeAssistant(jsonPayload, String.format("/services/runelite/%s", service));
 	}
 
 	private void sendPayloadToHomeAssistant(String jsonPayload) {
@@ -316,6 +347,10 @@ public class HomeassistantPlugin extends Plugin
 				response.close();
 			}
 		});
+	}
+
+	public void runDebug15Tick(){
+		log.debug("Debug 15 Tick");
 	}
 
 	private String getUsername() {

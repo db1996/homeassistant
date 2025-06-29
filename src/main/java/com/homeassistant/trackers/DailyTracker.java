@@ -5,7 +5,7 @@ import java.util.*;
 import com.homeassistant.HomeassistantConfig;
 import com.homeassistant.enums.DailyTask;
 
-import com.homeassistant.trackers.events.UpdateEntitiesEvent;
+import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
@@ -169,7 +169,7 @@ public class DailyTracker {
             return;
         }
 
-        eventBus.post(new UpdateEntitiesEvent.UpdateEntities(entities));
+        eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
     }
 
     private void reset(){
