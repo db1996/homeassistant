@@ -55,6 +55,10 @@ public class HomeassistantPlugin extends Plugin
 	private BirdhouseTracker  birdhouseTracker;
 	@Inject
 	private CollectionTracker collectionTracker;
+	@Inject
+	private CombatTaskTracker combatTaskTracker;
+	@Inject
+	private AchievementDiaryTracker  achievementDiaryTracker;
 
 	private final Map<String,Map<String, Object>> updateSortedEntities = new HashMap<>();
 
@@ -76,6 +80,8 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.register(farmingTracker);
 		eventBus.register(birdhouseTracker);
 		eventBus.register(collectionTracker);
+		eventBus.register(achievementDiaryTracker);
+		eventBus.register(combatTaskTracker);
 	}
 
 	@Override
@@ -87,6 +93,8 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(farmingTracker);
 		eventBus.unregister(birdhouseTracker);
 		eventBus.unregister(collectionTracker);
+		eventBus.unregister(achievementDiaryTracker);
+		eventBus.unregister(combatTaskTracker);
 
 		log.info("Homeassistant stopped!");
 	}

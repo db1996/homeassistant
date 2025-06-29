@@ -25,10 +25,18 @@ public interface HomeassistantConfig extends Config
 	)
 	String entitiesSection = "Entities";
 
+
+	@ConfigSection(
+			name = "Events",
+			description = "Select which events you want to send to homeassistant",
+			position = 300
+	)
+	String eventsSection = "Events";
+
 	@ConfigSection(
 			name = "Miscellaneous",
 			description = "Some miscellaneous settings",
-			position = 300
+			position = 400
 	)
 	String miscellaneousSection = "Miscellaneous";
 
@@ -185,7 +193,6 @@ public interface HomeassistantConfig extends Config
 			section = entitiesSection,
 			position = 210
 	)
-
 	default boolean aggressionTimer() {
 		return false;
 	}
@@ -197,8 +204,74 @@ public interface HomeassistantConfig extends Config
 			section = entitiesSection,
 			position = 210
 	)
-
 	default boolean skillBoosts() {
+		return false;
+	}
+
+
+	@ConfigItem(
+			keyName = "send_collection_log_events",
+			name = "Collection log events",
+			description = "Sends events when receiving a collection log",
+			section = eventsSection,
+			position = 301
+	)
+	default boolean sendCollectionLogEvents() {
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "test_collection_log_event",
+			name = "Test clog event",
+			description = "Sends a test collection log request to your homeassistant",
+			section = eventsSection,
+			position = 302
+	)
+	default boolean testCollectionLogEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "send_combat_task_events",
+			name = "Combat task events",
+			description = "Sends events when receiving completing a combat task",
+			section = eventsSection,
+			position = 303
+	)
+	default boolean sendCombatTaskEvents() {
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "test_combat_task_event",
+			name = "Test combat task event",
+			description = "Sends a test combat task request to your homeassistant",
+			section = eventsSection,
+			position = 304
+	)
+	default boolean testCombatTaskEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "send_diary_events",
+			name = "Achievement diary events",
+			description = "Sends events when completing an achievement diary",
+			section = eventsSection,
+			position = 305
+	)
+	default boolean sendDiaryEvents() {
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "test_diary_event",
+			name = "Test achievement diary event",
+			description = "Sends a test diary completion request to your homeassistant",
+			section = eventsSection,
+			position = 306
+	)
+	default boolean testDiaryEvent() {
 		return false;
 	}
 
@@ -207,7 +280,7 @@ public interface HomeassistantConfig extends Config
 			name = "Ignore Farming Guild",
 			description = "Ignore patches in the farming guild when determining the next update.",
 			section = miscellaneousSection,
-			position = 301
+			position = 401
 	)
 	default boolean ignoreFarmingGuild() {
 		return true;
@@ -218,7 +291,7 @@ public interface HomeassistantConfig extends Config
 			name = "Farming tick offset",
 			description = "Tick offsets are account specific, this will automatically update it in homeassistant.",
 			section = miscellaneousSection,
-			position = 302
+			position = 402
 	)
 	default boolean farmingTickOffset() {
 		return true;
@@ -230,7 +303,7 @@ public interface HomeassistantConfig extends Config
 			name = "Aggression timer delay (ticks)",
 			description = "Only updates the aggression timer every x ticks.",
 			section = miscellaneousSection,
-			position = 303
+			position = 403
 	)
 	default int aggressionTimerDelay() {
 		return 50;
@@ -241,31 +314,9 @@ public interface HomeassistantConfig extends Config
 			name = "Global tick throttle",
 			description = "Only updates homeassistant every x ticks. 0 for every tick",
 			section = miscellaneousSection,
-			position = 304
+			position = 404
 	)
 	default int globalUpdateThrottle() {
 		return 0;
-	}
-
-	@ConfigItem(
-			keyName = "send_collection_log_events",
-			name = "Collection log events",
-			description = "Sends events when receiving a collection log",
-			section = miscellaneousSection,
-			position = 305
-	)
-	default boolean sendCollectionLogEvents() {
-		return true;
-	}
-
-	@ConfigItem(
-			keyName = "test_collection_log_event",
-			name = "Test clog event",
-			description = "Sends a test collection log request to your homeassistant",
-			section = miscellaneousSection,
-			position = 306
-	)
-	default boolean testCollectionLogEvent() {
-		return false;
 	}
 }
