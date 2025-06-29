@@ -122,10 +122,10 @@ public class HomeassistantPlugin extends Plugin
 	public void onGameTick(GameTick event){
 		// If the user has a global throttled setup, it will only update once every x ticks
 		currentDelayCount++;
-		log.debug("tick received: {}", currentDelayCount);
 		if(currentDelayCount >= config.globalUpdateThrottle()){
 			currentDelayCount = 0;
 			if(getUsername() != null && !updateSortedEntities.isEmpty()){
+				log.debug("Updating sorted entities: {}", updateSortedEntities);
 				List<Map<String, Object>> entities = new ArrayList<>();
 				for(Map.Entry<String, Map<String, Object>> entry : updateSortedEntities.entrySet()){
 					entities.add(entry.getValue());
