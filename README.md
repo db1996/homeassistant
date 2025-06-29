@@ -10,8 +10,10 @@ Everything it can update in homeassistant:
 - Player online status + world
 - Player data (health, prayer, spec, run enegry)
 - Player status effects (poison and venom for now)
+- All skill boosts
 - Aggression timer
 - Farming tick offset
+- Collection log events
 
 ## Setup
 1. Install the plugin through the plugin hub
