@@ -136,7 +136,7 @@ public class FarmingTracker {
 
                         attributes.put("status", patchStatus.getName());
 
-                        entities.add(attributes); // ✅ add to array
+                        entities.add(attributes);
                         previousFarmingCompletionTimes.put(tab, farmingCompletionTimes.get(tab));
                     }
                 }
@@ -176,7 +176,7 @@ public class FarmingTracker {
                             }
                             attributes.put("status", patchStatus.getName());
 
-                            entities.add(attributes); // ✅ add to array
+                            entities.add(attributes);
                             previousFarmingContractCompletionTime = farmingContractCompletionTime;
                         }
                     }

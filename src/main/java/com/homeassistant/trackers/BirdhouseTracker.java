@@ -3,11 +3,9 @@ package com.homeassistant.trackers;
 import java.time.Instant;
 import java.util.*;
 
-import com.google.gson.Gson;
 import com.homeassistant.HomeassistantConfig;
 
 import com.homeassistant.enums.PatchStatus;
-import com.homeassistant.runelite.farming.*;
 import com.homeassistant.runelite.hunter.BirdHouseTracker;
 import com.homeassistant.trackers.events.UpdateEntitiesEvent;
 import lombok.extern.slf4j.Slf4j;

@@ -252,7 +252,7 @@ public class PlayerDataTracker {
                     .toLowerCase()
                     .replace(" ", "_");
         } catch (NullPointerException e) {
-//            log.error("Error fetching username: {}", e.getMessage());
+            log.error("Error fetching username: {}", e.getMessage());
             return null;
         }
     }

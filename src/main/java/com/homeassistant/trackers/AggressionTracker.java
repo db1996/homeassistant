@@ -159,10 +159,6 @@ public class AggressionTracker
         }
     }
 
-    private void CheckEntities(){
-
-    }
-
     private void initialize(WorldPoint location)
     {
         tile1 = location;
