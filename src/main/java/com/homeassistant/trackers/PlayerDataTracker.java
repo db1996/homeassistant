@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import com.homeassistant.HomeassistantConfig;
 import com.homeassistant.classes.StatusEffect;
+import com.homeassistant.classes.Utils;
 import com.homeassistant.trackers.events.HomeassistantEvents;
 
 import lombok.extern.slf4j.Slf4j;
@@ -98,7 +99,7 @@ public class PlayerDataTracker {
     private void checkAllEntities() {
         List<Map<String, Object>> entities = new ArrayList<>();
         if(currentHealth != previousHealth && config.playerHealth()){
-            String entityId = String.format("sensor.runelite_%s_health", getUsername());
+            String entityId = String.format("sensor.runelite_%s_health", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("current_health", currentHealth);
@@ -106,7 +107,7 @@ public class PlayerDataTracker {
         }
         if (currentPrayer != previousPrayer && config.playerPrayer())
         {
-            String entityId = String.format("sensor.runelite_%s_prayer", getUsername());
+            String entityId = String.format("sensor.runelite_%s_prayer", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("current_prayer", currentPrayer);
@@ -114,7 +115,7 @@ public class PlayerDataTracker {
         }
         if (currentSpecialAttack != previousSpecialAttack && config.playerSpecialAttack())
         {
-            String entityId = String.format("sensor.runelite_%s_special_attack", getUsername());
+            String entityId = String.format("sensor.runelite_%s_special_attack", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("current_special_attack", currentSpecialAttack);
@@ -122,7 +123,7 @@ public class PlayerDataTracker {
         }
         if (currentRunEnergy != previousRunEnergy && config.playerRunEnergy())
         {
-            String entityId = String.format("sensor.runelite_%s_run_energy", getUsername());
+            String entityId = String.format("sensor.runelite_%s_run_energy", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("current_run_energy", currentRunEnergy);
@@ -130,7 +131,7 @@ public class PlayerDataTracker {
         }
         if (!currentStatusEffects.equals(previousStatusEffects) && config.playerStatusEffects())
         {
-            String entityId = String.format("sensor.runelite_%s_status_effects", getUsername());
+            String entityId = String.format("sensor.runelite_%s_status_effects", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
 
@@ -152,7 +153,7 @@ public class PlayerDataTracker {
         if(config.skillBoosts()){
             for (Skill skill : Skill.values()) {
                 if (!Objects.equals(previousBoostedSkills.get(skill), boostedSkills.get(skill))) {
-                    String entityId = String.format("sensor.runelite_%s_skill_%s", getUsername(), skill.getName().toLowerCase().replaceAll(" ", "_"));
+                    String entityId = String.format("sensor.runelite_%s_skill_%s", Utils.GetUserName(client), skill.getName().toLowerCase().replaceAll(" ", "_"));
                     Map<String, Object> attributes = new HashMap<>();
                     attributes.put("entity_id", entityId);
                     attributes.put("virtual_level", boostedSkills.get(skill));
@@ -164,7 +165,7 @@ public class PlayerDataTracker {
 
 //		Player stats
         if((isOnline != previousIsOnline || onlineWorld != previousOnlineWorld) && config.playerOnlineStatus()) {
-            String entityId = String.format("sensor.runelite_%s_player_status", getUsername());
+            String entityId = String.format("sensor.runelite_%s_player_status", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("is_online", isOnline);
@@ -243,17 +244,6 @@ public class PlayerDataTracker {
 
         for (Skill skill : Skill.values()) {
             previousBoostedSkills.put(skill, boostedSkills.get(skill));
-        }
-    }
-
-    private String getUsername() {
-        try {
-            return Objects.requireNonNull(client.getLocalPlayer().getName())
-                    .toLowerCase()
-                    .replace(" ", "_");
-        } catch (NullPointerException e) {
-            log.error("Error fetching username: {}", e.getMessage());
-            return null;
         }
     }
 }

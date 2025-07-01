@@ -3,6 +3,8 @@ package com.homeassistant.trackers;
 import java.util.*;
 
 import com.homeassistant.HomeassistantConfig;
+import com.homeassistant.classes.Utils;
+import com.homeassistant.classes.Utils.*;
 import com.homeassistant.enums.DailyTask;
 
 import com.homeassistant.trackers.events.HomeassistantEvents;
@@ -49,7 +51,6 @@ public class DailyTracker {
         this.client = client;
         this.eventBus = eventBus;
         this.config = config;
-
         reset();
     }
 
@@ -322,20 +323,9 @@ public class DailyTracker {
 
     private String generateDailyEntityId(String str){
         try {
-            return String.format("sensor.runelite_%s_daily_%s", getUsername(), str.toLowerCase());
+            return String.format("sensor.runelite_%s_daily_%s", Utils.GetUserName(client), str.toLowerCase());
         }catch (NullPointerException e){
             log.error("Error generating entity id for daily {}: {}", str, e.getMessage());
-            return null;
-        }
-    }
-
-    private String getUsername() {
-        try {
-            return Objects.requireNonNull(client.getLocalPlayer().getName())
-                    .toLowerCase()
-                    .replace(" ", "_");
-        } catch (NullPointerException e) {
-            log.error("Error fetching username: {}", e.getMessage());
             return null;
         }
     }

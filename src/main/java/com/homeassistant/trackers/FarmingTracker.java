@@ -5,6 +5,7 @@ import java.util.*;
 
 import com.homeassistant.HomeassistantConfig;
 
+import com.homeassistant.classes.Utils;
 import com.homeassistant.enums.PatchStatus;
 import com.homeassistant.runelite.farming.*;
 import com.homeassistant.trackers.events.HomeassistantEvents;
@@ -100,7 +101,7 @@ public class FarmingTracker {
 
     @Subscribe
     public void onGameTick(GameTick event){
-        if(!hasChecked && getUsername() != null){
+        if(!hasChecked && Utils.GetUserName(client) != null){
             hasChecked = true;
             checkAll();
         }
@@ -204,7 +205,7 @@ public class FarmingTracker {
 
 
     private void checkAll() {
-        if(getUsername() == null){
+        if(Utils.GetUserName(client) == null){
             return;
         }
 
@@ -303,9 +304,9 @@ public class FarmingTracker {
     private String generateFarmingPatchEntityId(Tab tab) {
         try {
             if(tab == Tab.BIG_COMPOST){
-                return String.format("sensor.runelite_%s_compost_bin", getUsername());
+                return String.format("sensor.runelite_%s_compost_bin", Utils.GetUserName(client));
             }
-            return String.format("sensor.runelite_%s_%s_patch", getUsername(), tab.name().toLowerCase());
+            return String.format("sensor.runelite_%s_%s_patch", Utils.GetUserName(client), tab.name().toLowerCase());
         }catch (NullPointerException e){
             log.error("Error generating entity id for {}: {}", tab.name(), e.getMessage());
             return null;
@@ -314,7 +315,7 @@ public class FarmingTracker {
 
     private String generateFarmingContractEntityId() {
         try{
-            return String.format("sensor.runelite_%s_farming_contract", getUsername());
+            return String.format("sensor.runelite_%s_farming_contract", Utils.GetUserName(client));
         }catch (NullPointerException e){
             log.error("Error generating entity id for farming contract: {}", e.getMessage());
             return null;
@@ -323,20 +324,9 @@ public class FarmingTracker {
 
     private String GenerateFarmingTickEntityId() {
         try{
-            return String.format("sensor.runelite_%s_farming_tick_offset", getUsername());
+            return String.format("sensor.runelite_%s_farming_tick_offset", Utils.GetUserName(client));
         }catch (NullPointerException e){
             log.error("Error generating entity id for farming tick offset: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    private String getUsername() {
-        try {
-            return Objects.requireNonNull(client.getLocalPlayer().getName())
-                    .toLowerCase()
-                    .replace(" ", "_");
-        } catch (NullPointerException e) {
-            log.error("Error fetching username: {}", e.getMessage());
             return null;
         }
     }

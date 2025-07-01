@@ -5,6 +5,7 @@ import java.util.*;
 
 import com.homeassistant.HomeassistantConfig;
 
+import com.homeassistant.classes.Utils;
 import com.homeassistant.enums.PatchStatus;
 import com.homeassistant.runelite.hunter.BirdHouseTracker;
 import com.homeassistant.trackers.events.HomeassistantEvents;
@@ -90,14 +91,14 @@ public class BirdhouseTracker {
         if(!config.birdHouses()){
             return;
         }
-        if(!hasChecked && getUsername() != null){
+        if(!hasChecked && Utils.GetUserName(client) != null){
             hasChecked = true;
             checkAll();
         }
     }
 
     private void checkAll() {
-        if(getUsername() == null || !config.birdHouses()){
+        if(Utils.GetUserName(client) == null || !config.birdHouses()){
             hasChecked = false;
             return;
         }
@@ -148,22 +149,11 @@ public class BirdhouseTracker {
 
     private String generateBirdhouseEntityId() {
         try{
-            return String.format("sensor.runelite_%s_birdhouses", getUsername());
+            return String.format("sensor.runelite_%s_birdhouses", Utils.GetUserName(client));
         }catch (NullPointerException e){
             log.error("Error generating entity id for birdhouses: {}", e.getMessage());
             return null;
         }
 
-    }
-
-    private String getUsername() {
-        try {
-            return Objects.requireNonNull(client.getLocalPlayer().getName())
-                    .toLowerCase()
-                    .replace(" ", "_");
-        } catch (NullPointerException e) {
-            log.error("Error fetching username: {}", e.getMessage());
-            return null;
-        }
     }
 }

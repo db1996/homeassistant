@@ -1,6 +1,7 @@
 package com.homeassistant.trackers;
 
 import com.homeassistant.HomeassistantConfig;
+import com.homeassistant.classes.Utils;
 import com.homeassistant.enums.AggressionStatus;
 import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.Getter;
@@ -116,7 +117,7 @@ public class AggressionTracker
 
             int seconds = (int)(ticksLeft * 0.6f);
 
-            String entityId = String.format("sensor.runelite_%s_aggression", getUsername());
+            String entityId = String.format("sensor.runelite_%s_aggression", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
             attributes.put("entity_id", entityId);
             attributes.put("status", AggressionStatus.ACTIVE.getId());
@@ -134,7 +135,7 @@ public class AggressionTracker
         List<Map<String, Object>> entities = new ArrayList<>();
         active = false;
 
-        String entityId = String.format("sensor.runelite_%s_aggression", getUsername());
+        String entityId = String.format("sensor.runelite_%s_aggression", Utils.GetUserName(client));
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("entity_id", entityId);
         attributes.put("status", AggressionStatus.SAFE.getId());
@@ -215,16 +216,5 @@ public class AggressionTracker
         wasActive = false;
         tile1 = null;
         tile2 = null;
-    }
-
-    private String getUsername() {
-        try {
-            return Objects.requireNonNull(client.getLocalPlayer().getName())
-                    .toLowerCase()
-                    .replace(" ", "_");
-        } catch (NullPointerException e) {
-            log.error("Error fetching username: {}", e.getMessage());
-            return null;
-        }
     }
 }

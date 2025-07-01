@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 
+import com.homeassistant.classes.Utils;
 import com.homeassistant.trackers.*;
 import com.homeassistant.trackers.FarmingTracker;
 import com.homeassistant.trackers.events.HomeassistantEvents;
@@ -156,7 +157,7 @@ public class HomeassistantPlugin extends Plugin
 		currentDelayCount++;
 		if(currentDelayCount >= config.globalUpdateThrottle()){
 			currentDelayCount = 0;
-			if(getUsername() != null && !updateSortedEntities.isEmpty()){
+			if(Utils.GetUserName(client) != null && !updateSortedEntities.isEmpty()){
 				log.debug("Updating sorted entities: {}", updateSortedEntities);
 				List<Map<String, Object>> entities = new ArrayList<>();
 				for(Map.Entry<String, Map<String, Object>> entry : updateSortedEntities.entrySet()){
@@ -359,16 +360,5 @@ public class HomeassistantPlugin extends Plugin
 
 	public void runDebug15Tick(){
 		log.debug("Debug 15 Tick");
-	}
-
-	private String getUsername() {
-	    try {
-	        return Objects.requireNonNull(client.getLocalPlayer().getName())
-	                      .toLowerCase()
-	                      .replace(" ", "_");
-	    } catch (NullPointerException e) {
-	        log.error("Error fetching username: {}", e.getMessage());
-	        return null;
-	    }
 	}
 }
