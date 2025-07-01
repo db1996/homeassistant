@@ -60,6 +60,8 @@ public class HomeassistantPlugin extends Plugin
 	private CombatTaskTracker combatTaskTracker;
 	@Inject
 	private AchievementDiaryTracker  achievementDiaryTracker;
+	@Inject
+	private IdleTracker idleTracker;
 
 	private final Map<String,Map<String, Object>> updateSortedEntities = new HashMap<>();
 
@@ -83,6 +85,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.register(collectionTracker);
 		eventBus.register(achievementDiaryTracker);
 		eventBus.register(combatTaskTracker);
+		eventBus.register(idleTracker);
 	}
 
 	@Override
@@ -96,6 +99,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(collectionTracker);
 		eventBus.unregister(achievementDiaryTracker);
 		eventBus.unregister(combatTaskTracker);
+		eventBus.unregister(idleTracker);
 
 		log.info("Homeassistant stopped!");
 	}

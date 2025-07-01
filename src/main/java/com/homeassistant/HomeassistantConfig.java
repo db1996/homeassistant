@@ -40,6 +40,17 @@ public interface HomeassistantConfig extends Config
 	)
 	String miscellaneousSection = "Miscellaneous";
 
+	@ConfigSection(
+			name = "Debug",
+			description = "Debug settings",
+			position = 500
+	)
+	String DebugSection = "Debug";
+
+	/*
+		Homeassistant section
+	 */
+
 	@ConfigItem(
 			keyName = "homeassistant_url",
 			name = "Homeassistant Base URL",
@@ -76,6 +87,10 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	/*
+		Entities section
+	 */
+
 	@ConfigItem(
 			keyName = "farmingpatches",
 			name = "Farming patches",
@@ -86,6 +101,7 @@ public interface HomeassistantConfig extends Config
 	default boolean farmingPatches() {
 		return true;
 	}
+
 	@ConfigItem(
 			keyName = "farmingcontract",
 			name = "Farming contract",
@@ -96,7 +112,6 @@ public interface HomeassistantConfig extends Config
 	default boolean farmingContract() {
 		return true;
 	}
-
 
 	@ConfigItem(
 			keyName = "birdhouses",
@@ -208,6 +223,9 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	/*
+		Events section
+	 */
 
 	@ConfigItem(
 			keyName = "send_collection_log_events",
@@ -221,36 +239,14 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
-			keyName = "test_collection_log_event",
-			name = "Test clog event",
-			description = "Sends a test collection log request to your homeassistant",
-			section = eventsSection,
-			position = 302
-	)
-	default boolean testCollectionLogEvent() {
-		return false;
-	}
-
-	@ConfigItem(
 			keyName = "send_combat_task_events",
 			name = "Combat task events",
 			description = "Sends events when receiving completing a combat task",
 			section = eventsSection,
-			position = 303
+			position = 302
 	)
 	default boolean sendCombatTaskEvents() {
 		return true;
-	}
-
-	@ConfigItem(
-			keyName = "test_combat_task_event",
-			name = "Test combat task event",
-			description = "Sends a test combat task request to your homeassistant",
-			section = eventsSection,
-			position = 304
-	)
-	default boolean testCombatTaskEvent() {
-		return false;
 	}
 
 	@ConfigItem(
@@ -258,22 +254,36 @@ public interface HomeassistantConfig extends Config
 			name = "Achievement diary events",
 			description = "Sends events when completing an achievement diary",
 			section = eventsSection,
-			position = 305
+			position = 303
 	)
 	default boolean sendDiaryEvents() {
 		return true;
 	}
 
 	@ConfigItem(
-			keyName = "test_diary_event",
-			name = "Test achievement diary event",
-			description = "Sends a test diary completion request to your homeassistant",
+			keyName = "send_idle_events",
+			name = "Idle events",
+			description = "Sends events when you go idle",
 			section = eventsSection,
-			position = 306
+			position = 304
 	)
-	default boolean testDiaryEvent() {
-		return false;
+	default boolean sendIdleEvents() {
+		return true;
 	}
+	@ConfigItem(
+			keyName = "idle_tick_delay",
+			name = "Idle delay (ticks)",
+			description = "Updates once you've been idle for x ticks",
+			section = eventsSection,
+			position = 305
+	)
+	default int idleTickDelay() {
+		return 50;
+	}
+
+	/*
+		Miscellaneous section
+	 */
 
 	@ConfigItem(
 			keyName = "ignorefarmingguild",
@@ -297,7 +307,6 @@ public interface HomeassistantConfig extends Config
 		return true;
 	}
 
-
 	@ConfigItem(
 			keyName = "aggression_timer_delay",
 			name = "Aggression timer delay (ticks)",
@@ -319,4 +328,42 @@ public interface HomeassistantConfig extends Config
 	default int globalUpdateThrottle() {
 		return 0;
 	}
+
+	/*
+		Debug section
+	 */
+
+	@ConfigItem(
+			keyName = "test_collection_log_event",
+			name = "Test clog event",
+			description = "Sends a test collection log request to your homeassistant",
+			section = DebugSection,
+			position = 501
+	)
+	default boolean testCollectionLogEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "test_combat_task_event",
+			name = "Test combat task event",
+			description = "Sends a test combat task request to your homeassistant",
+			section = DebugSection,
+			position = 502
+	)
+	default boolean testCombatTaskEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "test_diary_event",
+			name = "Test achievement diary event",
+			description = "Sends a test diary completion request to your homeassistant",
+			section = DebugSection,
+			position = 503
+	)
+	default boolean testDiaryEvent() {
+		return false;
+	}
+
 }
