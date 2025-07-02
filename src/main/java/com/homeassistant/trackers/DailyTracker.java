@@ -4,144 +4,98 @@ import java.util.*;
 
 import com.homeassistant.HomeassistantConfig;
 import com.homeassistant.classes.Utils;
-import com.homeassistant.classes.Utils.*;
 import com.homeassistant.enums.DailyTask;
 
 import com.homeassistant.trackers.events.HomeassistantEvents;
+import com.homeassistant.trackers.events.InternalEvents;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
-import net.runelite.api.events.ChatMessage;
-import net.runelite.api.events.GameStateChanged;
-import net.runelite.api.events.GameTick;
-import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.util.Text;
+import net.runelite.client.events.ConfigChanged;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
 @Slf4j
 @Singleton
-public class DailyTracker {
-    private final EventBus eventBus;
-    private final Client client;
-    private final HomeassistantConfig config;
-
+public class DailyTracker extends BaseTracker {
+    protected final String TRACKER_ID = "dailyTracker";
+    protected final List<Integer> TRACKED_VARBITS = List.of(
+        VarbitID.NZONE_HERBBOXES_PURCHASED,
+        VarbitID.ZAFF_LAST_CLAIMED,
+        VarbitID.ARDOUGNE_FREE_ESSENCE,
+        VarbitID.LUNDAIL_LAST_CLAIMED,
+        VarbitID.YANILLE_SAND_CLAIMED,
+        VarbitID.SEERS_FREE_FLAX,
+        VarbitID.WESTERN_RANTZ_ARROWS,
+        VarbitID.KOUREND_FREE_DYNAMITE
+    );
     private static final int HERB_BOX_MAX = 15;
     private static final int HERB_BOX_COST = 9500;
     private static final int SAND_QUEST_COMPLETE = 160;
 
-
     private final Map<DailyTask, Integer> dailyStatuses = new EnumMap<>(DailyTask.class);
     private final Map<DailyTask, Integer> previousDailyStatuses = new EnumMap<>(DailyTask.class);
 
-    private boolean waitingForBattlestavesPurchase = false;
-    private long battlestaffWatchStart = 0;
-    private static final int BATTLESTAFF_WATCH_DURATION_MS = 120_000;
-    private static final int BATTLESTAFF_NOTED_ID = 1392;
-    private boolean isLoggingIn = false;
-
     @Inject
-    public DailyTracker(Client client, EventBus eventBus, HomeassistantConfig config)
+    public DailyTracker(Client client, EventBus eventBus, HomeassistantConfig config, VarbitTracker varbitTracker)
     {
-        this.client = client;
-        this.eventBus = eventBus;
-        this.config = config;
+        super(client, eventBus, config, varbitTracker);
         reset();
     }
 
-    @Subscribe
-    public void onChatMessage(ChatMessage event) {
-        if(!config.dailies()){
-            return;
-        }
+    @Override
+    protected String getVarbitTrackerId() {
+        return TRACKER_ID;
+    }
 
-        if (event.getType() == ChatMessageType.MESBOX &&
-                event.getMessage().equals("Bert delivers the sand to your bank.")) {
-            log.debug("Daily tracker: Detected bert delivery");
-            dailyStatuses.put(DailyTask.SAND, 1);
-        }
-
-        String message = Text.removeTags(event.getMessage());
-        if (message.contains("discounted battlestaves"))
-        {
-            waitingForBattlestavesPurchase = true;
-            battlestaffWatchStart = System.currentTimeMillis();
-            log.info("daily tracker: Detected battlestaff purchase prompt, starting {}s watch window.", (BATTLESTAFF_WATCH_DURATION_MS / 1000));
-        }
+    @Override
+    protected List<Integer> getTrackedVarbits() {
+        return TRACKED_VARBITS;
     }
 
     @Subscribe
-    public void onItemContainerChanged(ItemContainerChanged event)
-    {
-        if(!config.dailies()){
-            return;
-        }
-        // Make sure this doesn't constantly run, only run when the chatbox is detected
-        if (!waitingForBattlestavesPurchase)
-        {
-            return;
-        }
-        log.debug("daily tracker: itemcontainer changed {}", event);
-
-        // Check timeout
-        if (System.currentTimeMillis() - battlestaffWatchStart > BATTLESTAFF_WATCH_DURATION_MS)
-        {
-            waitingForBattlestavesPurchase = false;
-            log.info("daily tracker: Battlestaff watch window expired.");
-            return;
-        }
-
-        if (event.getContainerId() == InventoryID.INV)
-        {
-            ItemContainer container = event.getItemContainer();
-            if (container == null) return;
-
-            Item[] items = container.getItems();
-            boolean purchased = false;
-
-            for (Item item : items)
-            {
-                if (item.getId() == BATTLESTAFF_NOTED_ID)
-                {
-                    if (item.getQuantity() > 15){
-                        purchased = true;
-                    }
-                }
-            }
-
-            log.info("daily tracker: Battlestaff watch window purchased., {}", purchased);
-            if (purchased)
-            {
-                dailyStatuses.put(DailyTask.STAVES, 1);
-                waitingForBattlestavesPurchase = false;
-            }
-        }
-    }
-
-    @Subscribe
-    public void onGameStateChanged(GameStateChanged gameStateChanged) {
-        if(!config.dailies()){
-            return;
-        }
-
-        GameState gameState = gameStateChanged.getGameState();
-        if (gameState == GameState.LOGGING_IN) {
-            isLoggingIn = true;
-        }
-    }
-
-    @Subscribe
-    public void onGameTick(GameTick event){
-        if (isLoggingIn && config.dailies()){
-            isLoggingIn = false;
-            log.debug("daily tracker: checking all dailies");
+    public void onVarbitUpdate(InternalEvents.VarbitUpdate event) {
+        if (Objects.equals(event.getTrackerId(), TRACKER_ID)){
             checkAll();
         }
+    }
+
+    private void reset(){
+        dailyStatuses.clear();
+
+        for (DailyTask tab : DailyTask.values()) {
+            dailyStatuses.put(tab, -1);
+        }
+
+        resetPrevious();
+        this.setVarbitTracker(config.dailies(), -1);
+    }
+
+    private void resetPrevious(){
+
+        previousDailyStatuses.clear();
+        for (DailyTask tab : DailyTask.values()) {
+            previousDailyStatuses.put(tab, dailyStatuses.get(tab));
+        }
+    }
+
+    private void checkAll() {
+        if(!config.dailies()){
+            return;
+        }
+        checkHerbBoxes();
+        checkStaves();
+        checkEssence();
+        checkRunes();
+        checkSand();
+        checkFlax();
+        checkArrows();
+        checkDynamite();
+
         List<Map<String, Object>> entities = new ArrayList<>();
         if(config.dailies()) {
             try {
@@ -173,37 +127,11 @@ public class DailyTracker {
         eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
     }
 
-    private void reset(){
-        dailyStatuses.clear();
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (!event.getGroup().equals(HomeassistantConfig.CONFIG_GROUP)) return;
 
-        for (DailyTask tab : DailyTask.values()) {
-            dailyStatuses.put(tab, -1);
-        }
-
-        resetPrevious();
-    }
-
-
-    private void resetPrevious(){
-
-        previousDailyStatuses.clear();
-        for (DailyTask tab : DailyTask.values()) {
-            previousDailyStatuses.put(tab, dailyStatuses.get(tab));
-        }
-    }
-
-    private void checkAll() {
-        if(!config.dailies()){
-            return;
-        }
-        checkHerbBoxes();
-        checkStaves();
-        checkEssence();
-        checkRunes();
-        checkSand();
-        checkFlax();
-        checkArrows();
-        checkDynamite();
+        this.setVarbitTracker(config.dailies(), -1);
     }
 
     private void checkHerbBoxes()

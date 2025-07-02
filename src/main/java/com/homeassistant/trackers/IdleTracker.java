@@ -61,9 +61,7 @@ public class IdleTracker {
             log.debug("Player became idle, {}, {}", lastNonIdleTick, currentTick);
             sentEvent = true;
 
-            Map<String, Object> eventMap = new HashMap<>();
-            eventMap.put("idle", true);
-            eventBus.post(new HomeassistantEvents.SendEvent(eventMap, "trigger_player_idle"));
+            eventBus.post(new HomeassistantEvents.SendEvent(new HashMap<>(), "trigger_idle_notify"));
         }
     }
 

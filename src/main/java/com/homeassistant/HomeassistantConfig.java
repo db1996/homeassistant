@@ -25,7 +25,6 @@ public interface HomeassistantConfig extends Config
 	)
 	String entitiesSection = "Entities";
 
-
 	@ConfigSection(
 			name = "Events",
 			description = "Select which events you want to send to homeassistant",
@@ -280,6 +279,28 @@ public interface HomeassistantConfig extends Config
 	default int idleTickDelay() {
 		return 50;
 	}
+
+	@ConfigItem(
+			keyName = "varbit_ids_event",
+			name = "Watch VarBit ID",
+			description = "Send event when Varbit ID changes, comma seperated numbers",
+			section = eventsSection,
+			position = 306
+	)
+	default String varbitIdsEvent()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+			keyName = "varbit_ids_event_info",
+			name = "You can find the Varbit ID's in the runelite docs",
+			description = "https://github.com/runelite/runelite/blob/master/runelite-api/src/main/java/net/runelite/api/gameval/VarbitID.java",
+			section = eventsSection,
+			position = 307
+	)
+	default void varbitInfo() {}
+
 
 	/*
 		Miscellaneous section

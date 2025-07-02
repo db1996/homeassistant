@@ -27,6 +27,7 @@ public class PlayerDataTracker {
     private final EventBus eventBus;
     private final Client client;
     private final HomeassistantConfig config;
+    private final int PING_TICK_INTERVAL = 100;
 
 
     private int currentHealth = 0;
@@ -66,9 +67,7 @@ public class PlayerDataTracker {
         GameState gameState = gameStateChanged.getGameState();
 
         if(gameState == GameState.CONNECTION_LOST || gameState == GameState.LOGIN_SCREEN){
-            isOnline = false;
-            onlineWorld = -1;
-            checkAllEntities();
+            logOutEvent();
         }
 
         if (gameState != GameState.LOGGED_IN) {
@@ -94,6 +93,10 @@ public class PlayerDataTracker {
 
         checkCurrentStats();
         checkAllEntities();
+
+        if(client.getTickCount() % PING_TICK_INTERVAL == 0 && config.playerOnlineStatus()){
+            pingEvent();
+        }
     }
 
     private void checkAllEntities() {
@@ -165,9 +168,8 @@ public class PlayerDataTracker {
 
 //		Player stats
         if((isOnline != previousIsOnline || onlineWorld != previousOnlineWorld) && config.playerOnlineStatus()) {
-            String entityId = String.format("sensor.runelite_%s_player_status", Utils.GetUserName(client));
             Map<String, Object> attributes = new HashMap<>();
-            attributes.put("entity_id", entityId);
+            attributes.put("entity_id", playerStatusEntityId());
             attributes.put("is_online", isOnline);
             attributes.put("world", onlineWorld);
             entities.add(attributes);
@@ -245,5 +247,41 @@ public class PlayerDataTracker {
         for (Skill skill : Skill.values()) {
             previousBoostedSkills.put(skill, boostedSkills.get(skill));
         }
+    }
+
+    private void logOutEvent(){
+        isOnline = false;
+        onlineWorld = -1;
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("entity_id", playerStatusEntityId());
+        attributes.put("is_online", isOnline);
+        attributes.put("world", onlineWorld);
+
+        List<Map<String, Object>> entities = new ArrayList<>();
+        entities.add(attributes);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("entities", entities);
+
+        eventBus.post(new HomeassistantEvents.SendEvent(payload, "set_multi_entity_data"));
+        checkAllEntities();
+    }
+
+    private void pingEvent(){
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("entity_id", playerStatusEntityId());
+        attributes.put("is_online", isOnline);
+        attributes.put("world", onlineWorld);
+
+        List<Map<String, Object>> entities = new ArrayList<>();
+        entities.add(attributes);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("entities", entities);
+
+        eventBus.post(new HomeassistantEvents.SendEvent(payload, "set_multi_entity_data"));
+    }
+
+    private String playerStatusEntityId(){
+        return String.format("sensor.runelite_%s_player_status", Utils.GetUserName(client));
     }
 }
