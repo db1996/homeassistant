@@ -10,7 +10,6 @@ public interface HomeassistantConfig extends Config
 {
 	String CONFIG_GROUP = "homeassistant";
 
-
 	@ConfigSection(
 			name = "Homeassistant",
 			description = "Homeassistant connection settings",
@@ -384,6 +383,17 @@ public interface HomeassistantConfig extends Config
 			position = 503
 	)
 	default boolean testDiaryEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "aggression_area",
+			name = "Show aggression area and timer",
+			description = "Shows edge tiles of the 2 aggression squares",
+			section = DebugSection,
+			position = 504
+	)
+	default boolean aggressionShowArea() {
 		return false;
 	}
 

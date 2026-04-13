@@ -5,6 +5,7 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 
 import com.homeassistant.classes.Utils;
+import com.homeassistant.overlays.AggressionOverlay;
 import com.homeassistant.trackers.*;
 import com.homeassistant.trackers.FarmingTracker;
 import com.homeassistant.trackers.events.HomeassistantEvents;
@@ -18,6 +19,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayManager;
 import okhttp3.*;
 
 import java.io.IOException;
@@ -64,6 +66,10 @@ public class HomeassistantPlugin extends Plugin
 	private IdleTracker idleTracker;
 	@Inject
 	private VarbitTracker varbitTracker;
+	@Inject
+	private AggressionOverlay aggressionOverlay;
+	@Inject
+	OverlayManager overlayManager;
 
 	private final Map<String,Map<String, Object>> updateSortedEntities = new HashMap<>();
 
@@ -76,6 +82,8 @@ public class HomeassistantPlugin extends Plugin
 		currentDelayCount = -5;
 		updateSortedEntities.clear();
 		registerTrackers();
+
+		overlayManager.add(aggressionOverlay);
 	}
 
 	private void registerTrackers(){
@@ -105,6 +113,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(idleTracker);
 		eventBus.unregister(varbitTracker);
 
+		overlayManager.remove(aggressionOverlay);
 		log.info("Homeassistant stopped!");
 	}
 

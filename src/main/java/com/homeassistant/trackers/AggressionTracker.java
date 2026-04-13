@@ -12,6 +12,7 @@ import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
@@ -23,12 +24,13 @@ import java.util.*;
 @Singleton
 public class AggressionTracker
 {
-    private static final int AGGRESSION_TIMEOUT_TICKS = 1000; // ~10 minutes (600 seconds)
-    private static final int RESET_DISTANCE = 11; // Distance to trigger reset (>10 tiles)
+    private static final int AGGRESSION_TIMEOUT_TICKS = 1000;
+    private static final int RESET_DISTANCE = 11;
 
     private final EventBus eventBus;
     private final Client client;
     private final HomeassistantConfig config;
+    private final ConfigManager configManager;
 
     @Getter
     private int ticksLeft = 0;
@@ -36,28 +38,123 @@ public class AggressionTracker
     @Getter
     private boolean active = false;
 
-    // The game remembers exactly 2 tiles
+    @Getter
     private WorldPoint tile1;
+    @Getter
     private WorldPoint tile2;
+    private WorldPoint previousUnknownCenter;
+
     private boolean initialized = false;
     private boolean wasActive = false;
+    private boolean isLoaded = false;
 
     public int previousFiredEvent;
 
     @Inject
-    public AggressionTracker(Client client, EventBus eventBus, HomeassistantConfig config)
+    public AggressionTracker(Client client, EventBus eventBus, HomeassistantConfig config, ConfigManager configManager)
     {
         this.client = client;
         this.eventBus = eventBus;
         this.config = config;
+        this.configManager = configManager;
 
         this.previousFiredEvent = 0;
     }
 
+    private void saveToConfig()
+    {
+        log.debug("Saving config, {}, {}, {}, {}", tile1, tile2, ticksLeft, active);
+        if (tile1 != null && tile2 != null)
+        {
+            configManager.setConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile1X", tile1.getX());
+            configManager.setConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile1Y", tile1.getY());
+            configManager.setConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile2X", tile2.getX());
+            configManager.setConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile2Y", tile2.getY());
+            configManager.setConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTicksLeft", ticksLeft);
+        }
+    }
+
+    private void loadFromConfig()
+    {
+        if(isLoaded){
+            return;
+        }
+
+        Long x1Long = configManager.getConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile1X", Long.class);
+        Long y1Long = configManager.getConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile1Y", Long.class);
+        Long x2Long = configManager.getConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile2X", Long.class);
+        Long y2Long = configManager.getConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTile2Y", Long.class);
+        Long ticksLong = configManager.getConfiguration(HomeassistantConfig.CONFIG_GROUP, "aggressionTicksLeft", Long.class);
+
+        log.debug("Loaded config: {}, {}, {}, {}, {}", x1Long, y1Long, x2Long, y2Long, ticksLong);
+
+        Player player = client.getLocalPlayer();
+        if (player == null)
+        {
+            return;
+        }
+
+        WorldPoint currentLocation = player.getWorldLocation();
+
+        if ((x1Long == null || y1Long == null) && (x2Long == null || y2Long == null))
+        {
+            log.debug("Aggression config missing; nothing to load");
+            return;
+        }
+
+        // Reconstruct saved tiles
+        if (x1Long != null && y1Long != null)
+        {
+            tile1 = new WorldPoint(x1Long.intValue(), y1Long.intValue(), currentLocation.getPlane());
+        }
+        if (x2Long != null && y2Long != null)
+        {
+            tile2 = new WorldPoint(x2Long.intValue(), y2Long.intValue(), currentLocation.getPlane());
+        }
+
+        int savedTicks = ticksLong != null ? ticksLong.intValue() : 0;
+
+        // Measure distance to see if we are still in the same zone
+        int distanceFromTile1 = getDistance(currentLocation, tile1);
+        int distanceFromTile2 = getDistance(currentLocation, tile2);
+
+        if (distanceFromTile1 < RESET_DISTANCE || distanceFromTile2 < RESET_DISTANCE)
+        {
+            // Still in same zone
+            if (savedTicks <= 0)
+            {
+                log.debug("Previously expired and still in same zone. Staying inactive.");
+                ticksLeft = 0;
+                active = false;
+                initialized = true;
+                isLoaded = true;
+                return;
+            }
+            else
+            {
+                log.debug("Aggression timer still valid. Resuming from saved state.");
+                ticksLeft = savedTicks;
+                initialized = true;
+                isLoaded = true;
+                return;
+            }
+        }
+        else
+        {
+            log.debug("Logged in outside saved area. Staying inactive until movement resets aggression.");
+            aggroEnded();
+            previousUnknownCenter = currentLocation;
+            isLoaded = true;
+            return;
+        }
+    }
+
+
     @Subscribe
     public void onGameTick(GameTick event)
     {
-        if(!config.aggressionTimer()){
+        if (!config.aggressionTimer())
+        {
             return;
         }
 
@@ -69,33 +166,65 @@ public class AggressionTracker
 
         WorldPoint currentLocation = player.getWorldLocation();
 
-        if (!initialized)
-        {
-            // Initialize both tiles to current location
-            initialize(currentLocation);
+        if(currentLocation == null){
+            log.debug("Aggression config missing; nothing to load");
             return;
         }
 
-        // Check distance from both remembered tiles
-        int distanceFromTile1 = getDistance(currentLocation, tile1);
-        int distanceFromTile2 = getDistance(currentLocation, tile2);
-        if (this.previousFiredEvent  > 0){
-            this.previousFiredEvent--;
+
+
+        if (!isLoaded)
+        {
+            loadFromConfig();
+
+            // If we still failed to load config, and nothing is initialized, start tracking movement
+            if (!isLoaded && !initialized && previousUnknownCenter == null)
+            {
+                previousUnknownCenter = player.getWorldLocation();
+                log.debug("Aggression config not loaded. Tracking movement from {}", previousUnknownCenter);
+                isLoaded = true;
+                return;
+            }
         }
 
-        // If more than 10 tiles away from BOTH tiles, reset occurs
-        if (distanceFromTile1 >= RESET_DISTANCE && distanceFromTile2 >= RESET_DISTANCE)
+        if (previousUnknownCenter != null)
         {
-            // Reset: move the oldest tile (tile1) to current position
+            int distance = getDistance(currentLocation, previousUnknownCenter);
+
+            if (distance >= RESET_DISTANCE * 2)
+            {
+                log.debug("Moved far from unknown center ({} tiles). Starting new aggression zone.", distance);
+                startNewAggressionZone(currentLocation);
+                previousUnknownCenter = null;
+            }else{
+                previousUnknownCenter = currentLocation;
+            }
+            return;
+        }
+
+        if(!initialized){
+            return;
+        }
+
+        int dist1 = getDistance(currentLocation, tile1);
+        int dist2 = getDistance(currentLocation, tile2);
+
+        if (previousFiredEvent > 0)
+        {
+            previousFiredEvent--;
+        }
+
+        if (dist1 >= RESET_DISTANCE && dist2 >= RESET_DISTANCE)
+        {
             resetAggroTimer(currentLocation);
         }
         else
         {
-            // Still within range of at least one tile - continue countdown
             if (ticksLeft > 0)
             {
                 ticksLeft--;
-                if(previousFiredEvent == 0 && ticksLeft > 0){
+                if (previousFiredEvent == 0 && ticksLeft > 0)
+                {
                     aggroTick();
                 }
 
@@ -107,33 +236,47 @@ public class AggressionTracker
         }
     }
 
-    private void aggroTick(){
-        if(previousFiredEvent == 0) {
-            previousFiredEvent = config.aggressionTimerDelay();
+    private void startNewAggressionZone(WorldPoint center)
+    {
+        tile1 = center;
+        tile2 = center;
+        ticksLeft = AGGRESSION_TIMEOUT_TICKS;
+        active = true;
+        wasActive = true;
+        initialized = true;
 
-            List<Map<String, Object>> entities = new ArrayList<>();
-            active = true;
-            wasActive = true;
-
-            int seconds = (int)(ticksLeft * 0.6f);
-
-            String entityId = String.format("sensor.runelite_%s_aggression", Utils.GetUserName(client));
-            Map<String, Object> attributes = new HashMap<>();
-            attributes.put("entity_id", entityId);
-            attributes.put("status", AggressionStatus.ACTIVE.getId());
-            attributes.put("seconds", seconds);
-            attributes.put("ticks", ticksLeft);
-            entities.add(attributes);
-
-            eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
-        }
+        saveToConfig();
+        log.debug("Started new aggression zone at {}", center);
     }
 
-    private void aggroEnded(){
+
+    private void aggroTick()
+    {
         previousFiredEvent = config.aggressionTimerDelay();
 
         List<Map<String, Object>> entities = new ArrayList<>();
+        active = true;
+        wasActive = true;
+
+        int seconds = (int) (ticksLeft * 0.6f);
+
+        String entityId = String.format("sensor.runelite_%s_aggression", Utils.GetUserName(client));
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("entity_id", entityId);
+        attributes.put("status", AggressionStatus.ACTIVE.getId());
+        attributes.put("seconds", seconds);
+        attributes.put("ticks", ticksLeft);
+        entities.add(attributes);
+
+        eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
+    }
+
+    private void aggroEnded()
+    {
+        previousFiredEvent = config.aggressionTimerDelay();
         active = false;
+
+        List<Map<String, Object>> entities = new ArrayList<>();
 
         String entityId = String.format("sensor.runelite_%s_aggression", Utils.GetUserName(client));
         Map<String, Object> attributes = new HashMap<>();
@@ -149,21 +292,23 @@ public class AggressionTracker
     @Subscribe
     public void onGameStateChanged(GameStateChanged event)
     {
-        if(!config.aggressionTimer()){
+        if (!config.aggressionTimer())
+        {
             return;
         }
 
-        GameState gameState = event.getGameState();
-        if (gameState == GameState.LOADING || gameState == GameState.HOPPING || gameState == GameState.LOGIN_SCREEN)
+        GameState state = event.getGameState();
+        if (state == GameState.HOPPING || state == GameState.LOGIN_SCREEN)
         {
-            reset();
+            saveToConfig();
+            isLoaded = false;
         }
     }
 
-    private void initialize(WorldPoint location)
+    private void initialize(WorldPoint loc)
     {
-        tile1 = location;
-        tile2 = location;
+        tile1 = loc;
+        tile2 = loc;
         ticksLeft = AGGRESSION_TIMEOUT_TICKS;
         active = false;
         wasActive = false;
@@ -172,49 +317,37 @@ public class AggressionTracker
 
     private void resetAggroTimer(WorldPoint newLocation)
     {
-        boolean wasActiveBeforeReset = active;
+        boolean wasActiveBefore = active;
 
-        // Move oldest tile (tile1) to current location, tile2 becomes the new tile1
         tile1 = tile2;
         tile2 = newLocation;
 
-        // Reset timer
         ticksLeft = AGGRESSION_TIMEOUT_TICKS;
         active = false;
         wasActive = false;
 
-        // Only post reset event if we were previously active
-        if (wasActiveBeforeReset)
+        if (wasActiveBefore)
         {
-
+            log.debug("Aggression timer reset from movement.");
         }
-    }
-
-    /**
-     * Calculate the maximum distance between two points (Chebyshev distance)
-     * This matches how OSRS calculates tile distance
-     */
-    private int getDistance(WorldPoint point1, WorldPoint point2)
-    {
-        if (point1 == null || point2 == null)
-        {
-            return Integer.MAX_VALUE;
-        }
-
-        int deltaX = Math.abs(point1.getX() - point2.getX());
-        int deltaY = Math.abs(point1.getY() - point2.getY());
-
-        // Use Chebyshev distance (max of x and y differences)
-        return Math.max(deltaX, deltaY);
     }
 
     private void reset()
     {
-        initialized = false;
         ticksLeft = 0;
         active = false;
         wasActive = false;
         tile1 = null;
         tile2 = null;
+        initialized = false;
+    }
+
+    private int getDistance(WorldPoint a, WorldPoint b)
+    {
+        if (a == null || b == null || a.getPlane() != b.getPlane())
+        {
+            return Integer.MAX_VALUE;
+        }
+        return a.distanceTo(b);
     }
 }
