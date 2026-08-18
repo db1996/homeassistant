@@ -221,6 +221,17 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+			keyName = "skill_xp",
+			name = "Skill XP",
+			description = "Sends live XP per skill as it is gained, instead of waiting for the OSRS hiscores to catch up",
+			section = entitiesSection,
+			position = 211
+	)
+	default boolean skillXp() {
+		return false;
+	}
+
 	/*
 		Events section
 	 */

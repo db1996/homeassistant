@@ -42,6 +42,8 @@ public class PlayerDataTracker {
     private List<StatusEffect> previousStatusEffects = new ArrayList<>();
     private final Map<Skill, Integer> boostedSkills = new EnumMap<>(Skill.class);
     private final Map<Skill, Integer> previousBoostedSkills = new EnumMap<>(Skill.class);
+    private final Map<Skill, Integer> skillXp = new EnumMap<>(Skill.class);
+    private final Map<Skill, Integer> previousSkillXp = new EnumMap<>(Skill.class);
 
     private boolean previousIsOnline = false;
     private int previousOnlineWorld = -1;
@@ -57,6 +59,7 @@ public class PlayerDataTracker {
 
         for (Skill skill : Skill.values()) {
             boostedSkills.put(skill, 0);
+            skillXp.put(skill, 0);
         }
 
         resetPrevious();
@@ -81,7 +84,7 @@ public class PlayerDataTracker {
     @Subscribe
     public void onGameTick(GameTick event)
     {
-        if (!config.playerRunEnergy() && !config.playerHealth() && !config.playerPrayer() && !config.playerSpecialAttack() && !config.playerOnlineStatus() && !config.skillBoosts()){
+        if (!config.playerRunEnergy() && !config.playerHealth() && !config.playerPrayer() && !config.playerSpecialAttack() && !config.playerOnlineStatus() && !config.skillBoosts() && !config.skillXp()){
             return;
         }
 
@@ -153,15 +156,27 @@ public class PlayerDataTracker {
             entities.add(attributes);
         }
 
-        if(config.skillBoosts()){
+        if(config.skillBoosts() || config.skillXp()){
             for (Skill skill : Skill.values()) {
-                if (!Objects.equals(previousBoostedSkills.get(skill), boostedSkills.get(skill))) {
-                    String entityId = String.format("sensor.runelite_%s_skill_%s", Utils.GetUserName(client), skill.getName().toLowerCase().replaceAll(" ", "_"));
-                    Map<String, Object> attributes = new HashMap<>();
-                    attributes.put("entity_id", entityId);
-                    attributes.put("virtual_level", boostedSkills.get(skill));
-                    entities.add(attributes);
+                boolean boostChanged = config.skillBoosts()
+                        && !Objects.equals(previousBoostedSkills.get(skill), boostedSkills.get(skill));
+                boolean xpChanged = config.skillXp()
+                        && !Objects.equals(previousSkillXp.get(skill), skillXp.get(skill));
+
+                if (!boostChanged && !xpChanged) {
+                    continue;
                 }
+
+                String entityId = String.format("sensor.runelite_%s_skill_%s", Utils.GetUserName(client), skill.getName().toLowerCase().replaceAll(" ", "_"));
+                Map<String, Object> attributes = new HashMap<>();
+                attributes.put("entity_id", entityId);
+                if (config.skillBoosts()) {
+                    attributes.put("virtual_level", boostedSkills.get(skill));
+                }
+                if (config.skillXp()) {
+                    attributes.put("xp", skillXp.get(skill));
+                }
+                entities.add(attributes);
             }
         }
 
@@ -230,6 +245,12 @@ public class PlayerDataTracker {
                 boostedSkills.put(skill, client.getBoostedSkillLevel(skill));
             }
         }
+
+        if(config.skillXp()){
+            for (Skill skill : Skill.values()) {
+                skillXp.put(skill, client.getSkillExperience(skill));
+            }
+        }
     }
 
     private void resetPrevious(){
@@ -246,6 +267,7 @@ public class PlayerDataTracker {
 
         for (Skill skill : Skill.values()) {
             previousBoostedSkills.put(skill, boostedSkills.get(skill));
+            previousSkillXp.put(skill, skillXp.get(skill));
         }
     }
 
