@@ -222,6 +222,17 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "slayer_task",
+			name = "Slayer task",
+			description = "Sends the current slayer task, counts and location. Requires RuneLite's own Slayer plugin to be enabled",
+			section = entitiesSection,
+			position = 212
+	)
+	default boolean sendSlayerTask() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "skill_xp",
 			name = "Skill XP",
 			description = "Sends live XP per skill as it is gained, instead of waiting for the OSRS hiscores to catch up",
