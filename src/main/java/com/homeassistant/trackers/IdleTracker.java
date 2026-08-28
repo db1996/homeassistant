@@ -51,6 +51,18 @@ public class IdleTracker {
         if (animation != IDLE_ANIMATION ||
                 (pose != IDLE_ANIMATION && pose != player.getIdlePoseAnimation() )||
                 player.getInteracting() != null) {
+            // Only when we actually told Home Assistant the player went idle.
+            // This branch runs on every active tick, so without the guard it
+            // would fire continuously while the player is doing something.
+            if (sentEvent) {
+                log.debug("Player is active again after {} idle ticks", currentTick - lastNonIdleTick);
+
+                Map<String, Object> activeData = new HashMap<>();
+                activeData.put("idle_ticks", currentTick - lastNonIdleTick);
+
+                eventBus.post(new HomeassistantEvents.SendEvent(activeData, "trigger_active_notify"));
+            }
+
             lastNonIdleTick = currentTick;
             sentEvent = false; // allow idle event to fire again
             return;
@@ -61,7 +73,10 @@ public class IdleTracker {
             log.debug("Player became idle, {}, {}", lastNonIdleTick, currentTick);
             sentEvent = true;
 
-            eventBus.post(new HomeassistantEvents.SendEvent(new HashMap<>(), "trigger_idle_notify"));
+            Map<String, Object> idleData = new HashMap<>();
+            idleData.put("idle_ticks", currentTick - lastNonIdleTick);
+
+            eventBus.post(new HomeassistantEvents.SendEvent(idleData, "trigger_idle_notify"));
         }
     }
 
