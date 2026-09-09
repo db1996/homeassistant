@@ -233,6 +233,28 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "quest_progress",
+			name = "Quest progress",
+			description = "Sends the quest being worked on as its progress steps up, with quest points and completion counts",
+			section = entitiesSection,
+			position = 213
+	)
+	default boolean sendQuestProgress() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "quest_complete_event",
+			name = "Quest completed",
+			description = "Sends an event when a quest is completed",
+			section = eventsSection,
+			position = 308
+	)
+	default boolean sendQuestCompleteEvent() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "skill_xp",
 			name = "Skill XP",
 			description = "Sends live XP per skill as it is gained, instead of waiting for the OSRS hiscores to catch up",
