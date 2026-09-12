@@ -35,6 +35,7 @@ import java.util.Objects;
 @Singleton
 public class QuestTracker {
     private static final String PREFIX = "QUEST_";
+    private static final int COMPLETE_MAX_TICKS = 10;
     private static final Map<String, String> ALIASES = Map.of(
             "DESERTTREASURE", "DESERTTREASUREI",
             "DESERTTREASUREII", "DESERTTREASUREIIFALLENEMPIRE",
@@ -58,6 +59,10 @@ public class QuestTracker {
     private int currentStage = 0;
     private boolean sendOnTick = false;
     private boolean testRequested;
+    private String completedQuest = null;
+    private int completeTicksLeft = 0;
+    private boolean pointsChanged = false;
+    private int pointsChangedTick = -1;
 
     @Inject
     public QuestTracker(EventBus eventBus, Client client, HomeassistantConfig config) {
@@ -95,18 +100,28 @@ public class QuestTracker {
 
     @Subscribe
     public void onGameTick(GameTick tick) {
-        if (!sendOnTick) return;
+        if (sendOnTick) {
+            sendOnTick = false;
+            send();
 
-        sendOnTick = false;
-        send();
-
-        if (currentQuest == null) return;
-
-        String state = stateOf(currentQuest);
-        String was = lastStates.put(currentQuest, state);
-        if (config.sendQuestCompleteEvents() && "FINISHED".equals(state) && !"FINISHED".equals(was)) {
-            sendComplete(currentQuest, client.getVarpValue(VarPlayerID.QP));
+            if (currentQuest != null) {
+                String state = stateOf(currentQuest);
+                String was = lastStates.put(currentQuest, state);
+                if ("FINISHED".equals(state) && !"FINISHED".equals(was)) {
+                    completedQuest = currentQuest;
+                    completeTicksLeft = COMPLETE_MAX_TICKS;
+                    pointsChanged = client.getTickCount() - pointsChangedTick <= 1;
+                }
+            }
         }
+
+        if (completedQuest == null) return;
+        if (!pointsChanged && --completeTicksLeft > 0) return;
+
+        if (config.sendQuestCompleteEvents()) {
+            sendComplete(completedQuest, client.getVarpValue(VarPlayerID.QP));
+        }
+        completedQuest = null;
     }
 
     @Subscribe
@@ -129,6 +144,20 @@ public class QuestTracker {
     @Subscribe
     public void onVarbitChanged(VarbitChanged event) {
         if (!config.sendQuestProgress()) return;
+
+        boolean points = event.getVarbitId() == -1 && event.getVarpId() == VarPlayerID.QP;
+        if (points || event.getVarbitId() == VarbitID.QUESTS_COMPLETED_COUNT) {
+            Integer previous = lastValues.put(points ? "qp" : "completed", event.getValue());
+            if (previous == null || previous == event.getValue()) return;
+
+            log.debug("Quest {} changed: {} -> {}", points ? "points" : "count", previous, event.getValue());
+            if (points) {
+                pointsChanged = true;
+                pointsChangedTick = client.getTickCount();
+            }
+            sendOnTick = true;
+            return;
+        }
 
         String quest;
         String key;
