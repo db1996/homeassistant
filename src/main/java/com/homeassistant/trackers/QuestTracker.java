@@ -11,11 +11,13 @@ import net.runelite.api.GameState;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -33,6 +35,13 @@ import java.util.Objects;
 @Singleton
 public class QuestTracker {
     private static final String PREFIX = "QUEST_";
+    private static final Map<String, String> ALIASES = Map.of(
+            "DESERTTREASURE", "DESERTTREASUREI",
+            "DESERTTREASUREII", "DESERTTREASUREIIFALLENEMPIRE",
+            "RECIPEFORDISASTERDWARF", "RECIPEFORDISASTERMOUNTAINDWARF",
+            "RECIPEFORDISASTERMONKEYAMBASSADOR", "RECIPEFORDISASTERKINGAWOWOGEI",
+            "MAGEARENA", "MAGEARENAI"
+    );
 
     private final HomeassistantConfig config;
     private final EventBus eventBus;
@@ -47,36 +56,74 @@ public class QuestTracker {
     private Map<String, Object> lastSent = null;
     private String currentQuest = null;
     private int currentStage = 0;
+    private boolean sendOnTick = false;
+    private boolean testRequested;
 
     @Inject
     public QuestTracker(EventBus eventBus, Client client, HomeassistantConfig config) {
         this.eventBus = eventBus;
         this.client = client;
         this.config = config;
+        this.testRequested = config.testQuestCompleteEvent();
 
+        Map<String, Quest> byKey = new HashMap<>();
         for (Quest quest : Quest.values()) {
-            quests.put(quest.getName(), quest);
+            byKey.put(key(quest.name()), quest);
         }
         for (QuestVarbits varbit : QuestVarbits.values()) {
-            String name = questName(varbit.name());
+            String name = questName(varbit.name(), byKey);
             if (name != null) byVarbit.put(varbit.getId(), name);
         }
         for (QuestVarPlayer varp : QuestVarPlayer.values()) {
-            String name = questName(varp.name());
+            String name = questName(varp.name(), byKey);
             if (name != null) byVarp.put(varp.getId(), name);
         }
     }
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
-        if (event.getGameState() != GameState.LOGGED_IN) return;
+        GameState state = event.getGameState();
+        if (state != GameState.LOGGING_IN && state != GameState.HOPPING) return;
 
         lastValues.clear();
         lastStates.clear();
         currentQuest = null;
         currentStage = 0;
         lastSent = null;
+        sendOnTick = true;
+    }
+
+    @Subscribe
+    public void onGameTick(GameTick tick) {
+        if (!sendOnTick) return;
+
+        sendOnTick = false;
         send();
+
+        if (currentQuest == null) return;
+
+        String state = stateOf(currentQuest);
+        String was = lastStates.put(currentQuest, state);
+        if (config.sendQuestCompleteEvents() && "FINISHED".equals(state) && !"FINISHED".equals(was)) {
+            sendComplete(currentQuest, client.getVarpValue(VarPlayerID.QP));
+        }
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (!HomeassistantConfig.CONFIG_GROUP.equals(event.getGroup())) return;
+
+        if (!testRequested && config.testQuestCompleteEvent()) {
+            sendComplete("Test Quest", 0);
+        }
+        testRequested = config.testQuestCompleteEvent();
+    }
+
+    private void sendComplete(String quest, int questPoints) {
+        Map<String, Object> completed = new HashMap<>();
+        completed.put("quest", quest);
+        completed.put("quest_points", questPoints);
+        eventBus.post(new HomeassistantEvents.SendEvent(completed, "trigger_quest_complete_notify"));
     }
 
     @Subscribe
@@ -99,24 +146,27 @@ public class QuestTracker {
 
         currentQuest = quest;
         currentStage = event.getValue();
-        send();
-
-        String state = stateOf(quest);
-        String was = lastStates.put(quest, state);
-        if (config.sendQuestCompleteEvent() && "FINISHED".equals(state) && !"FINISHED".equals(was)) {
-            Map<String, Object> completed = new HashMap<>();
-            completed.put("quest", quest);
-            completed.put("quest_points", client.getVarpValue(VarPlayerID.QP));
-            eventBus.post(new HomeassistantEvents.SendEvent(completed, "trigger_quest_complete_notify"));
-        }
+        sendOnTick = true;
     }
 
-    private String questName(String constant) {
+    private String questName(String constant, Map<String, Quest> byKey) {
         if (!constant.startsWith(PREFIX) || constant.equals("QUEST_TAB")) return null;
 
         String name = constant.substring(PREFIX.length()).replaceAll("_STATE_\\d+$", "");
-        Quest quest = quests.get(readable(name));
-        return quest != null ? quest.getName() : readable(name);
+        String key = key(name);
+        Quest quest = byKey.get(ALIASES.getOrDefault(key, key));
+        if (quest == null) return readable(name);
+
+        quests.put(quest.getName(), quest);
+        return quest.getName();
+    }
+
+    private static String key(String constant) {
+        StringBuilder out = new StringBuilder();
+        for (String word : constant.split("_")) {
+            if (!word.equals("THE") && !word.equals("AND")) out.append(word);
+        }
+        return out.toString();
     }
 
     private String readable(String name) {
