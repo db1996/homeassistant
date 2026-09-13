@@ -233,6 +233,17 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "quest_progress",
+			name = "Quest progress",
+			description = "Sends the quest being worked on as its progress steps up, with quest points and completion counts",
+			section = entitiesSection,
+			position = 213
+	)
+	default boolean sendQuestProgress() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "skill_xp",
 			name = "Skill XP",
 			description = "Sends live XP per skill as it is gained, instead of waiting for the OSRS hiscores to catch up",
@@ -281,11 +292,22 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "send_quest_complete_events",
+			name = "Quest complete events",
+			description = "Sends an event when a quest is completed",
+			section = eventsSection,
+			position = 304
+	)
+	default boolean sendQuestCompleteEvents() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "send_idle_events",
 			name = "Idle events",
 			description = "Sends events when you go idle",
 			section = eventsSection,
-			position = 304
+			position = 305
 	)
 	default boolean sendIdleEvents() {
 		return true;
@@ -295,7 +317,7 @@ public interface HomeassistantConfig extends Config
 			name = "Idle delay (ticks)",
 			description = "Updates once you've been idle for x ticks",
 			section = eventsSection,
-			position = 305
+			position = 306
 	)
 	default int idleTickDelay() {
 		return 50;
@@ -306,7 +328,7 @@ public interface HomeassistantConfig extends Config
 			name = "Watch VarBit ID",
 			description = "Send event when Varbit ID changes, comma seperated numbers",
 			section = eventsSection,
-			position = 306
+			position = 307
 	)
 	default String varbitIdsEvent()
 	{
@@ -318,7 +340,7 @@ public interface HomeassistantConfig extends Config
 			name = "You can find the Varbit ID's in the runelite docs",
 			description = "https://github.com/runelite/runelite/blob/master/runelite-api/src/main/java/net/runelite/api/gameval/VarbitID.java",
 			section = eventsSection,
-			position = 307
+			position = 308
 	)
 	default void varbitInfo() {}
 
@@ -409,11 +431,22 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "test_quest_complete_event",
+			name = "Test quest complete event",
+			description = "Sends a test quest complete event to your homeassistant",
+			section = DebugSection,
+			position = 504
+	)
+	default boolean testQuestCompleteEvent() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "aggression_area",
 			name = "Show aggression area and timer",
 			description = "Shows edge tiles of the 2 aggression squares",
 			section = DebugSection,
-			position = 504
+			position = 505
 	)
 	default boolean aggressionShowArea() {
 		return false;
