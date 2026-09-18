@@ -76,8 +76,6 @@ public class SlayerTracker {
     public void onGameStateChanged(GameStateChanged event) {
         // On login the config is already populated but nothing has changed, so
         // without this the task would only appear after the first kill.
-        // The local player has no name yet on this tick, so sending now would
-        // address sensor.runelite_null_slayer_task. Wait for the name instead.
         if (event.getGameState() == GameState.LOGGED_IN) {
             lastSent = null;
             pendingLogin = true;

@@ -49,8 +49,6 @@ public class PlayerDataTracker {
     private int previousOnlineWorld = -1;
     private boolean isOnline = false;
     private int onlineWorld = -1;
-    // The local player is already gone when the logout state arrives, so the
-    // offline update needs the name from while they were still logged in.
     private String lastUsername = null;
 
     @Inject
@@ -281,7 +279,6 @@ public class PlayerDataTracker {
     private void logOutEvent(){
         isOnline = false;
         onlineWorld = -1;
-        // Never logged in this session: nobody to mark offline.
         if (lastUsername == null && Utils.GetUserName(client) == null) return;
 
         Map<String, Object> attributes = new HashMap<>();
@@ -295,8 +292,6 @@ public class PlayerDataTracker {
         payload.put("entities", entities);
 
         eventBus.post(new HomeassistantEvents.SendEvent(payload, "set_multi_entity_data"));
-        // Sent above already. Queueing it as well would hold the offline
-        // update until the next game tick, which is the next login.
         resetPrevious();
     }
 
