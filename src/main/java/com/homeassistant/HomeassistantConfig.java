@@ -254,6 +254,28 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+			keyName = "inventory",
+			name = "Inventory",
+			description = "Sends the items in your inventory and how many slots are free",
+			section = entitiesSection,
+			position = 214
+	)
+	default boolean sendInventory() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "equipment",
+			name = "Equipment",
+			description = "Sends the items you are wearing, per equipment slot",
+			section = entitiesSection,
+			position = 215
+	)
+	default boolean sendEquipment() {
+		return false;
+	}
+
 	/*
 		Events section
 	 */

@@ -72,6 +72,8 @@ public class HomeassistantPlugin extends Plugin
 	@Inject
 	private QuestTracker questTracker;
 	@Inject
+	private InventoryTracker inventoryTracker;
+	@Inject
 	private AggressionOverlay aggressionOverlay;
 	@Inject
 	OverlayManager overlayManager;
@@ -104,6 +106,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.register(varbitTracker);
 		eventBus.register(slayerTracker);
 		eventBus.register(questTracker);
+		eventBus.register(inventoryTracker);
 	}
 
 	@Override
@@ -120,6 +123,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(idleTracker);
 		eventBus.unregister(slayerTracker);
 		eventBus.unregister(questTracker);
+		eventBus.unregister(inventoryTracker);
 		eventBus.unregister(varbitTracker);
 
 		overlayManager.remove(aggressionOverlay);
