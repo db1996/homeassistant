@@ -295,7 +295,9 @@ public class PlayerDataTracker {
         payload.put("entities", entities);
 
         eventBus.post(new HomeassistantEvents.SendEvent(payload, "set_multi_entity_data"));
-        checkAllEntities();
+        // Sent above already. Queueing it as well would hold the offline
+        // update until the next game tick, which is the next login.
+        resetPrevious();
     }
 
     private void pingEvent(){
