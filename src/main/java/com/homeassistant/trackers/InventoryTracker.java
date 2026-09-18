@@ -27,26 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Reports what the player is carrying and wearing.
- *
- * Two entities, each behind its own toggle: the inventory (28 slots, with
- * how many are free -- the number an "inventory full" automation wants) and
- * the worn equipment, keyed by slot name.
- *
- * Changes are collected per game tick rather than sent as they happen. A
- * bank withdrawal or a full drop fires one ItemContainerChanged per item, and
- * a tick later they all describe the same container anyway. Reading the
- * container on the tick also sidesteps the login race where the container
- * event arrives before the local player has a name.
- */
 @Slf4j
 @Singleton
 public class InventoryTracker {
     private static final int INVENTORY_SLOTS = 28;
 
-    // The slots the equipment tab shows. ARMS, HAIR and JAW are internal
-    // slots the game uses for rendering; they never hold an item.
     private static final EquipmentInventorySlot[] WORN_SLOTS = {
             EquipmentInventorySlot.HEAD, EquipmentInventorySlot.CAPE,
             EquipmentInventorySlot.AMULET, EquipmentInventorySlot.WEAPON,
@@ -87,10 +72,6 @@ public class InventoryTracker {
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
-        // A fresh login has to re-send everything: the throttle in the plugin
-        // merges by entity_id, so a value equal to the last one sent before
-        // logging out would otherwise never reach Home Assistant again after
-        // a restart of either end.
         if (event.getGameState() == GameState.LOGGED_IN) {
             lastInventory = null;
             lastEquipment = null;
@@ -105,7 +86,7 @@ public class InventoryTracker {
         if (client.getGameState() != GameState.LOGGED_IN) return;
 
         String username = Utils.GetUserName(client);
-        if (username == null) return; // stays dirty, tried again next tick
+        if (username == null) return;
 
         List<Map<String, Object>> entities = new ArrayList<>();
 
@@ -154,8 +135,6 @@ public class InventoryTracker {
     }
 
     private Map<String, Object> readEquipment(String username) {
-        // LinkedHashMap so the slots arrive in the order the equipment tab
-        // shows them; a dashboard that lists them gets that for free.
         Map<String, Object> worn = new LinkedHashMap<>();
         ItemContainer container = client.getItemContainer(InventoryID.WORN);
         if (container != null) {
@@ -172,10 +151,6 @@ public class InventoryTracker {
         return attributes;
     }
 
-    /**
-     * One item as Home Assistant sees it. A noted item reports the name of
-     * the thing it is a note for, with "noted" set, rather than a bare id.
-     */
     private Map<String, Object> describe(Item item) {
         Map<String, Object> row = new HashMap<>();
         row.put("id", item.getId());
