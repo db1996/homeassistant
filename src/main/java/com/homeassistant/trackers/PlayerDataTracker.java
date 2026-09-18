@@ -49,6 +49,7 @@ public class PlayerDataTracker {
     private int previousOnlineWorld = -1;
     private boolean isOnline = false;
     private int onlineWorld = -1;
+    private String lastUsername = null;
 
     @Inject
     public PlayerDataTracker(Client client, EventBus eventBus, HomeassistantConfig config)
@@ -93,6 +94,10 @@ public class PlayerDataTracker {
         {
             return;
         }
+
+        String username = Utils.GetUserName(client);
+        if (username == null) return;
+        lastUsername = username;
 
         checkCurrentStats();
         checkAllEntities();
@@ -274,6 +279,7 @@ public class PlayerDataTracker {
     private void logOutEvent(){
         isOnline = false;
         onlineWorld = -1;
+        if (lastUsername == null && Utils.GetUserName(client) == null) return;
 
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("entity_id", playerStatusEntityId());
@@ -286,7 +292,7 @@ public class PlayerDataTracker {
         payload.put("entities", entities);
 
         eventBus.post(new HomeassistantEvents.SendEvent(payload, "set_multi_entity_data"));
-        checkAllEntities();
+        resetPrevious();
     }
 
     private void pingEvent(){
@@ -304,6 +310,10 @@ public class PlayerDataTracker {
     }
 
     private String playerStatusEntityId(){
-        return String.format("sensor.runelite_%s_player_status", Utils.GetUserName(client));
+        String username = Utils.GetUserName(client);
+        if (username != null) {
+            lastUsername = username;
+        }
+        return String.format("sensor.runelite_%s_player_status", lastUsername);
     }
 }
