@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -50,6 +51,7 @@ public class SlayerTracker {
     private final ConfigManager configManager;
 
     private Map<String, Object> lastSent = null;
+    private boolean pendingLogin = false;
 
     @Inject
     public SlayerTracker(EventBus eventBus, Client client, ConfigManager configManager,
@@ -74,10 +76,19 @@ public class SlayerTracker {
     public void onGameStateChanged(GameStateChanged event) {
         // On login the config is already populated but nothing has changed, so
         // without this the task would only appear after the first kill.
+        // The local player has no name yet on this tick, so sending now would
+        // address sensor.runelite_null_slayer_task. Wait for the name instead.
         if (event.getGameState() == GameState.LOGGED_IN) {
             lastSent = null;
-            sendTask();
+            pendingLogin = true;
         }
+    }
+
+    @Subscribe
+    public void onGameTick(GameTick event) {
+        if (!pendingLogin || Utils.GetUserName(client) == null) return;
+        pendingLogin = false;
+        sendTask();
     }
 
     private String readString(String key) {
@@ -98,11 +109,14 @@ public class SlayerTracker {
     private void sendTask() {
         if (!config.sendSlayerTask()) return;
 
+        String username = Utils.GetUserName(client);
+        if (username == null) return;
+
         String task = readString(TASK_NAME_KEY);
 
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("entity_id",
-                String.format("sensor.runelite_%s_slayer_task", Utils.GetUserName(client)));
+                String.format("sensor.runelite_%s_slayer_task", username));
         // No task is a state worth reporting, not a reason to send nothing --
         // otherwise a finished task would leave the last one on screen forever.
         attributes.put("task", task == null ? "None" : task);
