@@ -58,6 +58,7 @@ public class QuestTracker {
     private String currentQuest = null;
     private int currentStage = 0;
     private boolean sendOnTick = false;
+    private boolean seedStates = false;
     private boolean testRequested;
     private String completedQuest = null;
     private int completeTicksLeft = 0;
@@ -96,10 +97,19 @@ public class QuestTracker {
         currentStage = 0;
         lastSent = null;
         sendOnTick = true;
+        seedStates = true;
     }
 
     @Subscribe
     public void onGameTick(GameTick tick) {
+        if (seedStates) {
+            seedStates = false;
+            // Baseline, so a completion is measured against a real previous state.
+            for (Quest quest : quests.values()) {
+                lastStates.put(quest.getName(), stateOf(quest.getName()));
+            }
+        }
+
         if (sendOnTick) {
             sendOnTick = false;
             send();
@@ -107,7 +117,8 @@ public class QuestTracker {
             if (currentQuest != null) {
                 String state = stateOf(currentQuest);
                 String was = lastStates.put(currentQuest, state);
-                if ("FINISHED".equals(state) && !"FINISHED".equals(was)) {
+                // A quest seen for the first time is not a transition.
+                if (was != null && "FINISHED".equals(state) && !"FINISHED".equals(was)) {
                     completedQuest = currentQuest;
                     completeTicksLeft = COMPLETE_MAX_TICKS;
                     pointsChanged = client.getTickCount() - pointsChangedTick <= 1;
