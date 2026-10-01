@@ -23,35 +23,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Reports which skill the player is working on, read from their animation.
- *
- * The same thing RuneLite's own Mining and Woodcutting overlays go by: while
- * you swing a pickaxe you are mining, whether or not the next ore has landed.
- * Without this, Home Assistant only learns what you are doing from the first
- * XP drop, and only learns you stopped once the idle delay has passed.
- *
- * The animation lists are the ones the built-in Idle Notifier uses, split per
- * skill, minus the few that do not say which skill on their own (picking
- * something up, opening a chest, digging), plus lighting logs, pickpocketing
- * and crafting runes. Combat is read from your target instead.
- */
 @Slf4j
 @Singleton
 public class ActivityTracker {
     public static final String NONE = "none";
 
-    /**
-     * How many ticks an activity outlives its last matching animation. Most
-     * skilling animations restart with a tick or two of nothing in between,
-     * and reporting "none" for each of those gaps would flap the sensor.
-     */
     private static final int HOLD_TICKS = 5;
 
-    /**
-     * Combat gets longer: the gap between two attacks is the weapon's attack
-     * speed, up to 7 ticks for the slowest weapons.
-     */
     private static final int COMBAT_HOLD_TICKS = 10;
 
     public static final String COMBAT = "combat";
@@ -76,8 +54,6 @@ public class ActivityTracker {
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
         if (event.getGameState() == GameState.LOGGED_IN) {
-            // Send the current activity again after a login or hop, even if
-            // it did not change, so a restarted Home Assistant catches up.
             lastSent = null;
         }
     }
@@ -96,8 +72,6 @@ public class ActivityTracker {
         int currentTick = client.getTickCount();
         String skill = ANIMATIONS.get(player.getAnimation());
         if (skill == null && isFighting(player)) {
-            // Combat has no animation of its own -- every weapon has its own
-            // attack -- so it is read from who you are attacking instead.
             skill = COMBAT;
         }
         if (skill != null) {
@@ -121,11 +95,6 @@ public class ActivityTracker {
         eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
     }
 
-    /**
-     * Whether the player is attacking an NPC. Interacting alone is not enough:
-     * talking to a banker or a shopkeeper sets it too, so the NPC has to be
-     * one you can attack.
-     */
     private static boolean isFighting(Player player) {
         Actor target = player.getInteracting();
         if (!(target instanceof NPC)) return false;
@@ -139,7 +108,6 @@ public class ActivityTracker {
         return false;
     }
 
-    /** The skill an animation belongs to, or null when it says nothing. */
     public static String skillFor(int animation) {
         return ANIMATIONS.get(animation);
     }
@@ -219,8 +187,6 @@ public class ActivityTracker {
             AnimationID.FORESTRY_CAMPFIRE_BURNING_TEAK_LOGS,
             AnimationID.FORESTRY_CAMPFIRE_BURNING_WILLOW_LOGS,
             AnimationID.FORESTRY_CAMPFIRE_BURNING_YEW_LOGS,
-            // Lighting a log with a tinderbox or a bow. Not in the Idle
-            // Notifier's list: there each log is a separate action.
             AnimationID.HUMAN_CREATEFIRE,
             AnimationID.HUMAN_CREATEFIRE_SINGLE,
             AnimationID.BRUT_PLAYER_FIREMAKING_AIDE_SHORTBOW,
