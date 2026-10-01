@@ -4,8 +4,11 @@ import com.homeassistant.HomeassistantConfig;
 import com.homeassistant.classes.Utils;
 import com.homeassistant.trackers.events.HomeassistantEvents;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -30,7 +33,8 @@ import java.util.Map;
  *
  * The animation lists are the ones the built-in Idle Notifier uses, split per
  * skill, minus the few that do not say which skill on their own (picking
- * something up, opening a chest, digging).
+ * something up, opening a chest, digging), plus lighting logs, pickpocketing
+ * and crafting runes. Combat is read from your target instead.
  */
 @Slf4j
 @Singleton
@@ -43,6 +47,14 @@ public class ActivityTracker {
      * and reporting "none" for each of those gaps would flap the sensor.
      */
     private static final int HOLD_TICKS = 5;
+
+    /**
+     * Combat gets longer: the gap between two attacks is the weapon's attack
+     * speed, up to 7 ticks for the slowest weapons.
+     */
+    private static final int COMBAT_HOLD_TICKS = 10;
+
+    public static final String COMBAT = "combat";
 
     private static final Map<Integer, String> ANIMATIONS = buildAnimations();
 
@@ -83,12 +95,18 @@ public class ActivityTracker {
 
         int currentTick = client.getTickCount();
         String skill = ANIMATIONS.get(player.getAnimation());
+        if (skill == null && isFighting(player)) {
+            // Combat has no animation of its own -- every weapon has its own
+            // attack -- so it is read from who you are attacking instead.
+            skill = COMBAT;
+        }
         if (skill != null) {
             lastSkill = skill;
             lastSeenTick = currentTick;
         }
 
-        String activity = lastSkill != null && currentTick - lastSeenTick <= HOLD_TICKS
+        int hold = COMBAT.equals(lastSkill) ? COMBAT_HOLD_TICKS : HOLD_TICKS;
+        String activity = lastSkill != null && currentTick - lastSeenTick <= hold
                 ? lastSkill
                 : NONE;
         if (activity.equals(lastSent)) return;
@@ -101,6 +119,24 @@ public class ActivityTracker {
 
         List<Map<String, Object>> entities = Collections.singletonList(attributes);
         eventBus.post(new HomeassistantEvents.UpdateEntities(entities));
+    }
+
+    /**
+     * Whether the player is attacking an NPC. Interacting alone is not enough:
+     * talking to a banker or a shopkeeper sets it too, so the NPC has to be
+     * one you can attack.
+     */
+    private static boolean isFighting(Player player) {
+        Actor target = player.getInteracting();
+        if (!(target instanceof NPC)) return false;
+        NPCComposition composition = ((NPC) target).getTransformedComposition();
+        if (composition == null) return false;
+        String[] actions = composition.getActions();
+        if (actions == null) return false;
+        for (String action : actions) {
+            if ("Attack".equalsIgnoreCase(action)) return true;
+        }
+        return false;
     }
 
     /** The skill an animation belongs to, or null when it says nothing. */
@@ -182,7 +218,24 @@ public class ActivityTracker {
             AnimationID.FORESTRY_CAMPFIRE_BURNING_REDWOOD_LOGS,
             AnimationID.FORESTRY_CAMPFIRE_BURNING_TEAK_LOGS,
             AnimationID.FORESTRY_CAMPFIRE_BURNING_WILLOW_LOGS,
-            AnimationID.FORESTRY_CAMPFIRE_BURNING_YEW_LOGS);
+            AnimationID.FORESTRY_CAMPFIRE_BURNING_YEW_LOGS,
+            // Lighting a log with a tinderbox or a bow. Not in the Idle
+            // Notifier's list: there each log is a separate action.
+            AnimationID.HUMAN_CREATEFIRE,
+            AnimationID.HUMAN_CREATEFIRE_SINGLE,
+            AnimationID.BRUT_PLAYER_FIREMAKING_AIDE_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_OAK_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_WILLOW_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_MAPLE_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_YEW_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_MAGIC_SHORTBOW,
+            AnimationID.BRUT_PLAYER_FIREMAKING_DAGANOTH_BOW);
+        put(map, "thieving",
+            AnimationID.HUMAN_PICKPOCKET);
+        put(map, "runecraft",
+            AnimationID.HUMAN_RUNECRAFT,
+            AnimationID.HUMAN_RUNECRAFT_WALKMERGE);
         put(map, "cooking",
             AnimationID.HUMAN_FIRECOOKING,
             AnimationID.HUMAN_COOKING,

@@ -20,6 +20,17 @@ public class ActivityTrackerTest {
     }
 
     @Test
+    public void lightingLogsIsFiremaking() {
+        assertEquals("firemaking", ActivityTracker.skillFor(AnimationID.HUMAN_CREATEFIRE));
+    }
+
+    @Test
+    public void pickpocketingIsThievingAndCraftingRunesIsRunecraft() {
+        assertEquals("thieving", ActivityTracker.skillFor(AnimationID.HUMAN_PICKPOCKET));
+        assertEquals("runecraft", ActivityTracker.skillFor(AnimationID.HUMAN_RUNECRAFT));
+    }
+
+    @Test
     public void animationsThatSayNothingAreNotMapped() {
         assertNull(ActivityTracker.skillFor(-1));
         assertNull(ActivityTracker.skillFor(AnimationID.HUMAN_DIG));
