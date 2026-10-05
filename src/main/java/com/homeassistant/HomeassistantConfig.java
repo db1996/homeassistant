@@ -276,6 +276,17 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+			keyName = "activity",
+			name = "Activity",
+			description = "Sends which skill you are working on, read from your animation (mining, fishing, woodcutting, ...)",
+			section = entitiesSection,
+			position = 216
+	)
+	default boolean sendActivity() {
+		return false;
+	}
+
 	/*
 		Events section
 	 */
