@@ -4,6 +4,8 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Range;
+import net.runelite.client.config.Units;
 
 @ConfigGroup("homeassistant")
 public interface HomeassistantConfig extends Config
@@ -336,11 +338,46 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "send_gem_crab_hp_threshold_events",
+			name = "Gem crab HP threshold event",
+			description = "Sends an event when the gem crab's HP drops below the threshold",
+			section = eventsSection,
+			position = 305
+	)
+	default boolean sendGemCrabHpThresholdEvents() {
+		return false;
+	}
+
+	@Range(min = 1, max = 100)
+	@Units(Units.PERCENT)
+	@ConfigItem(
+			keyName = "gem_crab_hp_threshold",
+			name = "HP threshold %",
+			description = "The gem crab HP percentage at which the threshold event is sent",
+			section = eventsSection,
+			position = 306
+	)
+	default int gemCrabHpThreshold() {
+		return 5;
+	}
+
+	@ConfigItem(
+			keyName = "send_gem_crab_can_mine_events",
+			name = "Gem crab can mine event",
+			description = "Sends an event when the gem crab can be mined",
+			section = eventsSection,
+			position = 307
+	)
+	default boolean sendGemCrabCanMineEvents() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "send_idle_events",
 			name = "Idle events",
 			description = "Sends events when you go idle",
 			section = eventsSection,
-			position = 305
+			position = 308
 	)
 	default boolean sendIdleEvents() {
 		return true;
@@ -350,7 +387,7 @@ public interface HomeassistantConfig extends Config
 			name = "Idle delay (ticks)",
 			description = "Updates once you've been idle for x ticks",
 			section = eventsSection,
-			position = 306
+			position = 309
 	)
 	default int idleTickDelay() {
 		return 50;
@@ -361,7 +398,7 @@ public interface HomeassistantConfig extends Config
 			name = "Watch VarBit ID",
 			description = "Send event when Varbit ID changes, comma seperated numbers",
 			section = eventsSection,
-			position = 307
+			position = 310
 	)
 	default String varbitIdsEvent()
 	{
@@ -373,7 +410,7 @@ public interface HomeassistantConfig extends Config
 			name = "You can find the Varbit ID's in the runelite docs",
 			description = "https://github.com/runelite/runelite/blob/master/runelite-api/src/main/java/net/runelite/api/gameval/VarbitID.java",
 			section = eventsSection,
-			position = 308
+			position = 311
 	)
 	default void varbitInfo() {}
 
@@ -475,11 +512,33 @@ public interface HomeassistantConfig extends Config
 	}
 
 	@ConfigItem(
+			keyName = "test_gem_crab_hp_threshold_event",
+			name = "Test gem crab HP threshold event",
+			description = "Sends a test gem crab HP threshold event to your homeassistant",
+			section = DebugSection,
+			position = 505
+	)
+	default boolean testGemCrabHpThresholdEvent() {
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "test_gem_crab_can_mine_event",
+			name = "Test gem crab can mine event",
+			description = "Sends a test gem crab can mine event to your homeassistant",
+			section = DebugSection,
+			position = 506
+	)
+	default boolean testGemCrabCanMineEvent() {
+		return false;
+	}
+
+	@ConfigItem(
 			keyName = "aggression_area",
 			name = "Show aggression area and timer",
 			description = "Shows edge tiles of the 2 aggression squares",
 			section = DebugSection,
-			position = 505
+			position = 507
 	)
 	default boolean aggressionShowArea() {
 		return false;
