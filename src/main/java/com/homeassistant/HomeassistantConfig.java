@@ -289,6 +289,42 @@ public interface HomeassistantConfig extends Config
 		return false;
 	}
 
+	@ConfigItem(
+			keyName = "miscellania",
+			name = "Miscellania",
+			description = "Update the Miscellania coffer and approval entities. Values are read when you visit the kingdom",
+			section = entitiesSection,
+			position = 217
+	)
+	default boolean miscellania() {
+		return true;
+	}
+
+	@Range(min = 0, max = 7_500_000)
+	@ConfigItem(
+			keyName = "miscellania_coffer_threshold",
+			name = "Miscellania coffer threshold",
+			description = "Coffer amount to warn at. 0 picks the optimal amount: 500k, or 750k after Royal Trouble",
+			section = entitiesSection,
+			position = 218
+	)
+	default int miscellaniaCofferThreshold() {
+		return 0;
+	}
+
+	@Range(min = 25, max = 100)
+	@Units(Units.PERCENT)
+	@ConfigItem(
+			keyName = "miscellania_approval_threshold",
+			name = "Miscellania approval threshold",
+			description = "Approval percentage to warn at",
+			section = entitiesSection,
+			position = 219
+	)
+	default int miscellaniaApprovalThreshold() {
+		return 75;
+	}
+
 	/*
 		Events section
 	 */

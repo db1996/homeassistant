@@ -16,6 +16,7 @@ import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 
 import javax.inject.Inject;
@@ -76,6 +77,20 @@ public class InventoryTracker {
             lastInventory = null;
             lastEquipment = null;
             inventoryDirty = true;
+            equipmentDirty = true;
+        }
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (!HomeassistantConfig.CONFIG_GROUP.equals(event.getGroup())) return;
+
+        // Send right away when switched on, instead of waiting for the next item change.
+        if ("inventory".equals(event.getKey())) {
+            lastInventory = null;
+            inventoryDirty = true;
+        } else if ("equipment".equals(event.getKey())) {
+            lastEquipment = null;
             equipmentDirty = true;
         }
     }

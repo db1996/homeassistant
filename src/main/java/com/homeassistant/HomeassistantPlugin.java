@@ -78,6 +78,8 @@ public class HomeassistantPlugin extends Plugin
 	@Inject
 	private GemCrabTracker gemCrabTracker;
 	@Inject
+	private MiscellaniaTracker miscellaniaTracker;
+	@Inject
 	private AggressionOverlay aggressionOverlay;
 	@Inject
 	OverlayManager overlayManager;
@@ -113,6 +115,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.register(inventoryTracker);
 		eventBus.register(activityTracker);
 		eventBus.register(gemCrabTracker);
+		eventBus.register(miscellaniaTracker);
 	}
 
 	@Override
@@ -132,6 +135,7 @@ public class HomeassistantPlugin extends Plugin
 		eventBus.unregister(inventoryTracker);
 		eventBus.unregister(activityTracker);
 		eventBus.unregister(gemCrabTracker);
+		eventBus.unregister(miscellaniaTracker);
 		eventBus.unregister(varbitTracker);
 
 		overlayManager.remove(aggressionOverlay);
