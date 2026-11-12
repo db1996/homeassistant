@@ -39,7 +39,6 @@ public class FarmingTracker {
     private static final List<Tab> IGNORE_TABS = List.of(
             Tab.GRAPE,
             Tab.TIME_OFFSET,
-            Tab.ANIMA,
             Tab.SPECIAL,
             Tab.BELLADONNA,
             Tab.CALQUAT,
